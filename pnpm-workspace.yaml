@@ -1,0 +1,12 @@
+packages:
+  - apps/*
+  - packages/*
+
+allowBuilds:
+  esbuild: true
+  sharp: true
+  unrs-resolver: true
+  mongodb-memory-server: true
+
+minimumReleaseAgeExclude:
+  - zod@4.6.4
