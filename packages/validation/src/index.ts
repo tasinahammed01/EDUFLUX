@@ -10,11 +10,14 @@ export const registerSchema = z.object({
   primaryPersona: primaryPersonaSchema
 }).strict();
 export const loginSchema = z.object({ email: emailSchema, password: z.string().min(1).max(128) }).strict();
+export const sessionLoginSchema = z.object({ idToken: z.string().min(20).max(10_000), primaryPersona: primaryPersonaSchema.optional() }).strict();
+export const onboardingSchema = z.object({ primaryPersona: primaryPersonaSchema }).strict();
 export const createClassSchema = z.object({ name: z.string().trim().min(2).max(100), description: z.string().trim().max(500).optional() }).strict();
 export const joinClassSchema = z.object({ joinCode: z.string().trim().toUpperCase().regex(/^[A-HJ-NP-Z2-9]{8}$/, "Enter a valid 8-character class code.") }).strict();
 export const memberQuerySchema = z.object({ page: z.coerce.number().int().min(1).default(1), limit: z.coerce.number().int().min(1).max(100).default(20) });
 
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
+export type SessionLoginInput = z.infer<typeof sessionLoginSchema>;
 export type CreateClassInput = z.infer<typeof createClassSchema>;
 export type JoinClassInput = z.infer<typeof joinClassSchema>;

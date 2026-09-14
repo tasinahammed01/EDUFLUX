@@ -6,13 +6,16 @@ export type ClassMembershipRole = "OWNER" | "TEACHER" | "STUDENT";
 
 export interface PublicUser {
   id: string;
+  firebaseUid: string;
   displayName: string;
   email: string;
-  primaryPersona: PrimaryPersona;
+  photoURL?: string;
+  emailVerified: boolean;
+  primaryPersona?: PrimaryPersona | undefined;
   platformRole: PlatformRole;
 }
 
-export interface AuthSession { user: PublicUser }
+export interface AuthSession { user: PublicUser; requiresOnboarding: boolean }
 
 export interface ClassSummary {
   id: string;

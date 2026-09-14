@@ -1,41 +1,4 @@
-import { expect, test } from "@playwright/test";
-
-test("teacher creates a class and student joins without teacher permissions", async ({ page }) => {
-  await page.goto("/register");
-  await page.getByLabel("Display name").fill("E2E Teacher");
-  await page.getByLabel("Email address").fill("teacher-e2e@example.com");
-  await page.locator('input[name="password"]').fill("correct horse battery staple");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/teacher\/dashboard$/);
-
-  await page.getByLabel("Class name").fill("E2E Literature");
-  await page.getByLabel(/Description/).fill("Browser verified class");
-  await page.getByRole("button", { name: "Create class" }).click();
-  const classCard = page.getByRole("article").filter({ hasText: "E2E Literature" });
-  await expect(classCard).toBeVisible();
-  const codeButton = classCard.getByRole("button", { name: /Copy join code/ });
-  const joinCode = (await codeButton.getAttribute("aria-label"))?.split(" ").at(-1);
-  expect(joinCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);
-  const classLink = classCard.getByRole("link", { name: /Open class/ });
-  const classHref = await classLink.getAttribute("href");
-
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await expect(page).toHaveURL(/\/login$/);
-  await page.goto("/register");
-  await page.getByRole("button", { name: /Student/ }).click();
-  await page.getByLabel("Display name").fill("E2E Student");
-  await page.getByLabel("Email address").fill("student-e2e@example.com");
-  await page.locator('input[name="password"]').fill("correct horse battery staple");
-  await page.getByRole("button", { name: "Create account" }).click();
-  await expect(page).toHaveURL(/\/student\/dashboard$/);
-  await page.getByLabel("Class code").fill(joinCode!);
-  await page.getByRole("button", { name: "Join class" }).click();
-  await expect(page.getByRole("article").filter({ hasText: "E2E Literature" })).toBeVisible();
-
-  const classId = classHref?.split("/").at(-1);
-  const forbidden = await page.request.get(`/api/v1/classes/${classId}/members`);
-  expect(forbidden.status()).toBe(403);
-  await page.getByRole("button", { name: "Sign out" }).click();
-  await page.goto("/student/dashboard");
-  await expect(page).toHaveURL(/\/login$/);
-});
+import{expect,test,type Page}from"@playwright/test";
+let sequence=0;function testToken(persona:"TEACHER"|"STUDENT"){const id=++sequence;return"test-id."+Buffer.from(JSON.stringify({uid:`e2e-${persona.toLowerCase()}-${id}`,email:`${persona.toLowerCase()}-${id}@e2e.example`,name:`E2E ${persona}`,email_verified:true,auth_time:Math.floor(Date.now()/1000),firebase:{sign_in_provider:"password"}})).toString("base64url")}
+async function authenticate(page:Page,persona:"TEACHER"|"STUDENT"){await page.goto("/login");const csrf=await page.request.get("/api/v1/auth/csrf"),token=(await csrf.json()).data.csrfToken;const response=await page.request.post("/api/v1/auth/session-login",{headers:{origin:"http://127.0.0.1:3000","x-csrf-token":token},data:{idToken:testToken(persona),primaryPersona:persona}});expect(response.ok()).toBe(true);await page.goto(persona==="TEACHER"?"/teacher/dashboard":"/student/dashboard")}
+test("teacher creates a class and student joins without teacher permissions",async({page})=>{await authenticate(page,"TEACHER");await page.getByLabel("Class name").fill("E2E Literature");await page.getByLabel(/Description/).fill("Browser verified class");await page.getByRole("button",{name:"Create class"}).click();const card=page.getByRole("article").filter({hasText:"E2E Literature"});await expect(card).toBeVisible();const joinCode=(await card.getByRole("button",{name:/Copy join code/}).getAttribute("aria-label"))?.split(" ").at(-1);const classHref=await card.getByRole("link",{name:/Open class/}).getAttribute("href");expect(joinCode).toMatch(/^[A-HJ-NP-Z2-9]{8}$/);await page.getByRole("button",{name:"Sign out"}).click();await authenticate(page,"STUDENT");await page.getByLabel("Class code").fill(joinCode!);await page.getByRole("button",{name:"Join class"}).click();await expect(page.getByRole("article").filter({hasText:"E2E Literature"})).toBeVisible();expect((await page.request.get(`/api/v1/classes/${classHref?.split("/").at(-1)}/members`)).status()).toBe(403);await page.getByRole("button",{name:"Sign out"}).click();await page.goto("/student/dashboard");await expect(page).toHaveURL(/\/login$/)});

@@ -1,40 +1,36 @@
 # Architecture
 
-## Runtime boundaries
+## Responsibilities
 
-Next.js owns presentation and server-side route protection. The Phase 1 marketing homepage remains server-rendered, with narrow client boundaries for navigation, GSAP enhancement, and its optional adaptive Three.js scene. Authentication and application screens use the same design system without adding WebGL.
+- Firebase Authentication owns passwords, provider linking, Google authentication, and primary identity.
+- Express owns verified session exchange, cookies, CSRF, account status, authorization, and DTO boundaries.
+- MongoDB owns the application user, persona, platform role, classes, and memberships.
+- Next.js owns UI and server-side protected-route redirects. The marketing homepage remains statically optimized and does not import Firebase.
 
-Express owns all application APIs under `/api/v1`. Next rewrites same-origin browser requests to the API, so no public API base URL or secret is shipped to the client. The worker remains an independently deployable process without a queue dependency until a background workload exists.
+## Identity and sessions
 
-## Authentication flow
+`POST /api/v1/auth/session-login` accepts only a Firebase ID token and an optional validated onboarding persona. Firebase Admin verifies the token and its recent `auth_time`; Express then upserts by indexed `firebaseUid` and creates a Firebase session cookie. Production uses `__Host-eduflux.session` with HttpOnly, Secure, SameSite=Lax, and Path=/.
 
-1. A client fetches `GET /api/v1/auth/csrf`. Express sets an HttpOnly signed CSRF cookie and returns the same token for the request header.
-2. Register and login validate strict shared Zod schemas. Emails are trimmed and canonicalized; passwords are hashed with Argon2id. Login also executes a dummy hash verification for unknown accounts.
-3. Express stores only a SHA-256 hash of a cryptographically random session token and sets the raw token in an HttpOnly cookie. Session expiry is checked in application code; Mongo's TTL index performs eventual cleanup.
-4. Protected requests resolve the session, load the current user, reject expired/revoked sessions and non-active accounts, and expose a minimal principal to downstream handlers.
-5. Logout deletes the session by token hash and is idempotent. Logout-all deletes every session owned by the authenticated user.
+Each authenticated API request verifies the cookie once with revocation checking and performs one indexed Mongo lookup by Firebase UID. The attached principal contains only Mongo user ID, Firebase UID, platform role, and optional persona. Logout clears the cookie; logout-all also revokes Firebase refresh tokens.
 
-Production cookies use `__Host-eduflux.sid` and `__Host-eduflux.csrf` with `Secure`, `HttpOnly`, `SameSite=Lax`, and `Path=/`. Mutations require the CSRF cookie/header pair; supplied browser origins must exactly match `WEB_ORIGIN`. The API must be deployed behind HTTPS. `TRUST_PROXY_HOPS` must match the real proxy topology so rate-limit keys and IP HMACs cannot be spoofed.
+CSRF remains mandatory for session exchange, onboarding, logout, class creation, and class joining. Supplied origins must match `WEB_ORIGIN`.
 
-## Data model and indexes
+## User model
 
-- `users`: public email/display name, canonical email, Argon2id hash, platform role, primary persona, status, and login-defense counters. Canonical email is uniquely indexed.
-- `sessions`: token hash, user, expiry, creation/last-seen timestamps, and privacy-preserving client metadata. Token hash is unique; expiry has a TTL index.
-- `classes`: owner, name, description, status, and an unambiguous eight-character join code. Join code is unique.
-- `classmemberships`: class/user pair, membership role, and status. The pair is unique; lookup indexes cover user/status and class/status. A partial unique index guarantees one active owner per class.
+Users contain `firebaseUid`, canonical email, display name, optional photo, provider identifiers, optional persona, platform role, status, email verification, and timestamps. Unique indexes cover Firebase UID and canonical email. Password hashes, login counters, custom session tokens, and the session collection were removed.
 
-Class creation inserts the class and its owner membership in one Mongo transaction. This is why every environment, including development and test, must use a replica set. Joining is duplicate-safe and always assigns `STUDENT`; the request cannot supply a role. Class and member access uses membership records, not the user's selected UI persona. Only owners and teachers may list members, and member responses intentionally omit email addresses.
+Firebase UID maps to one Mongo user `_id`; existing class-membership references therefore remain unchanged. Client input can select only TEACHER or STUDENT as an initial persona. It cannot set platform or class roles.
 
-## Reliability and observability
+## Google onboarding
 
-The API connects to Mongo before listening and exposes liveness and database-aware readiness endpoints. Mongoose buffering is disabled, pool/connect limits are explicit, and production does not create indexes implicitly. API failures use stable JSON envelopes with request IDs. Pino logs structured request summaries while redacting security material. Graceful shutdown closes HTTP and database connections.
+A first Google exchange creates a user without a persona and returns `requiresOnboarding: true`. The UI redirects to `/onboarding`; the authenticated, CSRF-protected onboarding endpoint performs a first-write-only persona update.
 
-## Verification strategy
+## Runtime and performance
 
-Vitest covers validation and UI behavior. API integration tests run against an isolated real MongoDB replica set and verify indexes, transactions and rollback, hashing/session persistence, CSRF/origin defenses, expiry/revocation, rate limiting, duplicate joins, and membership authorization. Playwright exercises teacher registration and class creation, student registration and joining, forbidden member access, logout, and protected-route redirects against the production Next.js server and isolated API database.
+Mongo connects once before the API listens, with disabled buffering, bounded pooling, and database-aware readiness. Readiness also requires Firebase Admin initialization. Normal authentication is one Firebase verification plus one indexed Mongo query. Class membership queries retain their compound indexes and batched class listing.
 
-The release gate is: frozen install, lint, TypeScript checks, all tests, production build, then Playwright. Node 24 LTS is the supported runtime.
+Firebase client modules are referenced only from auth-route client code. They are absent from the marketing page source graph, so the GSAP/Three.js homepage architecture is unchanged.
 
-## Dependency direction
+## Deployment
 
-Applications may consume packages. Shared packages cannot consume applications. `shared-types` contains transport contracts, `validation` contains runtime schemas, `config` contains non-secret defaults, and `utils` remains dependency-light. Database and cryptography packages are API-only and never enter the browser bundle.
+Production startup intentionally fails without Firebase Admin credentials. Run index creation only after migrating legacy users to Firebase UIDs. Configure the exact production web origin, correct proxy-hop count, Firebase authorized domain, HTTPS, Atlas least-privilege credentials, and a restricted Atlas network policy.

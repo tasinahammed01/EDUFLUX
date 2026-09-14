@@ -12,7 +12,7 @@ function mapSummary(record: { _id: { toString(): string }; name: string; descrip
   return { id: record._id.toString(), name: record.name, ...(record.description ? { description: record.description } : {}), ...(membership.role !== "STUDENT" ? { joinCode: record.joinCode } : {}), role: membership.role, joinedAt: membership.joinedAt.toISOString(), createdAt: record.createdAt.toISOString(), ...(memberCount !== undefined ? { memberCount } : {}) };
 }
 
-export async function createClass(input: CreateClassInput, userId: string, persona: string): Promise<ClassSummary> {
+export async function createClass(input: CreateClassInput, userId: string, persona?: string): Promise<ClassSummary> {
   if (persona !== "TEACHER") throw new ApiError(403, "FORBIDDEN", "Your current teaching profile is required to create a class.");
   for (let attempt = 0; attempt < 5; attempt += 1) {
     try {

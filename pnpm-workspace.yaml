@@ -7,6 +7,8 @@ allowBuilds:
   sharp: true
   unrs-resolver: true
   mongodb-memory-server: true
+  '@firebase/util': true
+  protobufjs: true
 
 minimumReleaseAgeExclude:
   - zod@4.6.4

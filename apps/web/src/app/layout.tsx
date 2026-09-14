@@ -3,6 +3,7 @@ import { Instrument_Serif, Manrope } from "next/font/google";
 import "./globals.css";
 import "./marketing.css";
 import "./interaction.css";
+import "./auth-firebase.css";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const instrumentSerif = Instrument_Serif({ subsets: ["latin"], variable: "--font-editorial", weight: "400", display: "swap" });

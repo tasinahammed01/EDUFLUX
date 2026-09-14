@@ -1,36 +1,39 @@
 # EduFlux
 
-EduFlux is a production-oriented education SaaS monorepo. Phase 2 adds durable authentication, authorization, and class membership workflows while preserving the Phase 1 marketing homepage.
+EduFlux is a production-oriented education SaaS monorepo. Firebase Authentication supplies identity, Express verifies identity and owns authorization, and MongoDB stores application profiles, roles, classes, and memberships.
 
-## Prerequisites
+## Requirements
 
-- Node.js 24 LTS (see `.nvmrc`)
+- Node.js 24 LTS
 - pnpm 12.4.1
-- MongoDB replica set (transactions are required for atomic class creation)
+- A MongoDB Atlas database or replica set
+- Firebase Email/Password and Google providers enabled
+- Firebase Admin service-account credentials or Application Default Credentials
 
-Copy `apps/api/.env.example` to `apps/api/.env` and provide strong secrets and a replica-set Mongo URI. Copy `apps/web/.env.example` when the API is not available at `http://localhost:5000` from the Next.js server.
+## Local configuration
 
-```bash
-pnpm install --frozen-lockfile
-pnpm dev
-```
+1. Run `pnpm install --frozen-lockfile`.
+2. Copy `apps/web/.env.example` to `apps/web/.env.local` and add the Firebase Web configuration.
+3. Copy `apps/api/.env.example` to `apps/api/.env`.
+4. Set `MONGODB_URI` to the URL-encoded Atlas connection string for the `eduflux` database.
+5. Set `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, and `FIREBASE_PRIVATE_KEY`, or configure `GOOGLE_APPLICATION_CREDENTIALS`. Escaped private-key newlines are supported.
+6. Ensure Atlas Network Access permits the development machine. Do not use unrestricted production access.
+7. Add `localhost` and later the production hostname to Firebase Authentication authorized domains.
+8. Run `pnpm dev`, then test email registration/login, Google onboarding, both dashboards, and class creation/joining.
 
-The web app runs at `http://localhost:3000`; the API runs at `http://localhost:5000`. The browser talks to same-origin `/api/v1/*` paths, which Next.js proxies to Express.
+Never commit `.env`, service-account JSON, private keys, or MongoDB credentials.
 
-## Workspace
+## Authentication flow
 
 ```text
-apps/
-  web/       Next.js App Router marketing, auth, and class UI
-  api/       Express 5 API, Mongo models, auth and class domains
-  worker/    Background-process foundation
-packages/
-  config/        Cross-service constants
-  shared-types/  Transport-safe TypeScript contracts
-  validation/    Shared Zod request schemas
-  utils/         Dependency-light general utilities
-docs/            Architecture records
+Browser -> Firebase Auth -> ID token -> Express /api/v1/auth/session-login
+        -> Firebase Admin verification -> MongoDB application user
+        -> Secure HttpOnly Firebase session cookie -> protected APIs
 ```
+
+Email and password are sent only to Firebase. The client exchanges a fresh ID token for a seven-day server session and then clears client Firebase state. Google users without an application persona are sent to `/onboarding`. MongoDB roles and class memberships remain server-authoritative.
+
+Existing pre-Firebase users require an explicit migration to Firebase UIDs. Development databases may be cleared; production users must be mapped after a verified Firebase account migration. Do not create the new unique UID index over unmigrated production records.
 
 ## Commands
 
@@ -44,15 +47,4 @@ pnpm --filter @eduflux/api db:indexes
 pnpm --filter @eduflux/web test:e2e
 ```
 
-The API integration suite and browser test create an isolated, disposable MongoDB replica set. The Playwright flow requires the production web build first. `db:indexes` safely creates declared indexes and should run during deployment before traffic is shifted.
-
-## Security model
-
-- Passwords use Argon2id; raw passwords and session tokens are never stored.
-- Sessions are server-side Mongo records addressed by a random opaque cookie. Production uses a `Secure`, `HttpOnly`, `SameSite=Lax`, host-only `__Host-` cookie.
-- Mutations require a signed double-submit CSRF token and reject untrusted browser origins.
-- Authentication and class-join routes are rate limited; repeated credential failures temporarily lock the account.
-- Authorization is evaluated from current user and membership records on every request. Client-provided roles are ignored.
-- Logs redact credentials, cookies, CSRF values, hashes, tokens, and secrets.
-
-See [docs/architecture.md](docs/architecture.md) for data models, request flows, and deployment details.
+Automated authentication uses a test-only identity gateway and an isolated Mongo replica set. It never writes to Firebase or Atlas.
