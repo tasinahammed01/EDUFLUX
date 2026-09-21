@@ -1,0 +1,419 @@
+.class-hero {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 2rem;
+  padding: 1.8rem;
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: linear-gradient(135deg, #0d1c36, #071127);
+}
+.class-hero h1 {
+  margin: 0;
+}
+.class-hero p {
+  max-width: 48rem;
+  color: var(--muted);
+}
+.class-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.class-facts span {
+  padding: 0.4rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 2rem;
+  color: #bac6d6;
+  font-size: 0.65rem;
+}
+.invite-compact {
+  display: grid;
+  min-width: 10rem;
+  gap: 0.4rem;
+  padding: 1rem;
+  border: 1px dashed #42dff555;
+  border-radius: 0.7rem;
+}
+.invite-compact small {
+  color: var(--muted);
+}
+.invite-compact strong {
+  color: var(--cyan);
+  font-size: 1.2rem;
+  letter-spacing: 0.12em;
+}
+.invite-compact button,
+.invite-panel button,
+.member-list button,
+.text-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  border: 0;
+  color: var(--cyan);
+  background: transparent;
+  cursor: pointer;
+}
+.invite-compact svg,
+.invite-panel svg,
+.member-search svg {
+  width: 1rem;
+}
+.copy-notice {
+  color: var(--cyan);
+  font-size: 0.7rem;
+}
+.class-tabs {
+  display: flex;
+  gap: 0.3rem;
+  margin: 1.5rem 0;
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+.class-tabs button {
+  padding: 0.85rem 1rem;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  color: var(--muted);
+  text-transform: capitalize;
+  background: transparent;
+  cursor: pointer;
+}
+.class-tabs button[aria-current="page"] {
+  border-color: var(--cyan);
+  color: var(--foreground);
+}
+.class-overview {
+  display: grid;
+  grid-template-columns: 1.25fr 0.75fr;
+  gap: 1rem;
+}
+.class-overview > article,
+.invite-panel,
+.settings-panel,
+.assignment-form,
+.assignment-list > article,
+.assignment-detail > section {
+  padding: 1.3rem;
+  border: 1px solid var(--border);
+  border-radius: 0.85rem;
+  background: #08142a;
+}
+.class-overview h2,
+.invite-panel h2,
+.assignment-section h2,
+.settings-panel h2 {
+  margin-top: 0;
+  font-family: var(--font-display);
+}
+.class-overview dl {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+.class-overview dl div {
+  padding: 0.8rem;
+  border-radius: 0.6rem;
+  background: #0d1c36;
+}
+.class-overview dt {
+  color: var(--muted);
+  font-size: 0.6rem;
+}
+.class-overview dd {
+  margin: 0.3rem 0 0;
+}
+.invite-panel > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.7rem 0;
+  border-bottom: 1px solid var(--border);
+}
+.invite-panel span {
+  display: grid;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+.invite-panel strong {
+  color: var(--foreground);
+  letter-spacing: 0.1em;
+}
+.invite-panel summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.8rem 0;
+  color: var(--cyan);
+  cursor: pointer;
+}
+.invite-panel details img {
+  display: block;
+  width: min(100%, 20rem);
+  margin: 0 auto 1rem;
+  border-radius: 0.5rem;
+}
+.member-title {
+  flex-wrap: wrap;
+}
+.member-search {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+.member-search input {
+  min-height: 2.4rem;
+}
+.member-list strong small {
+  display: block;
+  margin-top: 0.2rem;
+  color: var(--muted);
+  font-weight: 400;
+}
+.assignment-section > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.assignment-section header p {
+  color: var(--muted);
+}
+.assignment-form {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+.assignment-form > label,
+.assignment-form .form-grid label,
+.settings-panel label {
+  display: grid;
+  gap: 0.4rem;
+}
+.assignment-form input,
+.assignment-form textarea,
+.settings-panel input,
+.settings-panel textarea {
+  width: 100%;
+  padding: 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  color: var(--foreground);
+  background: #061127;
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+.check-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+.assignment-form footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.6rem;
+}
+.assignment-list {
+  display: grid;
+  gap: 0.7rem;
+}
+.assignment-list > article {
+  display: grid;
+  grid-template-columns: 1fr auto auto auto;
+  align-items: center;
+  gap: 1rem;
+}
+.assignment-list h3 {
+  margin: 0.25rem 0;
+}
+.assignment-list p,
+.assignment-list span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+.assignment-list a {
+  color: var(--cyan);
+}
+.settings-panel form {
+  display: grid;
+  gap: 1rem;
+}
+.danger-zone {
+  margin-top: 2rem;
+  padding: 1rem;
+  border: 1px solid #e8788855;
+  border-radius: 0.7rem;
+}
+.danger-zone button {
+  color: #ff9dab;
+}
+.join-page {
+  display: grid;
+  min-height: 100svh;
+  place-items: center;
+  padding: 1rem;
+  background: var(--background);
+}
+.join-card {
+  width: min(32rem, 100%);
+  padding: clamp(1.3rem, 5vw, 2.5rem);
+  border: 1px solid var(--border);
+  border-radius: 1rem;
+  background: var(--surface);
+}
+.join-card h1 {
+  font-family: var(--font-display);
+}
+.join-card dl {
+  display: grid;
+  gap: 0.7rem;
+  margin: 1.5rem 0;
+}
+.join-card dl div {
+  display: flex;
+  justify-content: space-between;
+}
+.join-card dt {
+  color: var(--muted);
+}
+.join-card dd {
+  margin: 0;
+}
+.join-actions {
+  display: flex;
+  gap: 0.7rem;
+}
+.assignment-detail .assignment-lead {
+  color: var(--muted);
+  font-size: 1.05rem;
+}
+.assignment-facts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1rem;
+}
+.assignment-facts div {
+  display: grid;
+  gap: 0.4rem;
+}
+.assignment-facts small {
+  color: var(--muted);
+}
+.assignment-detail section > a {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--cyan);
+}
+.assignment-detail section > a svg {
+  width: 1rem;
+}
+.submission-workspace {
+  display: grid;
+  gap: 1rem;
+}
+.submission-workspace > header,
+.submission-filters {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+}
+.submission-workspace textarea,
+.submission-filters input,
+.submission-filters select {
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  background: var(--surface);
+  color: var(--text);
+  padding: 0.8rem;
+}
+.submission-workspace textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 12rem;
+}
+.submission-list {
+  display: grid;
+  gap: 0.65rem;
+}
+.submission-list article {
+  display: grid;
+  grid-template-columns: minmax(10rem, 2fr) 1fr 1fr 1.5fr;
+  gap: 1rem;
+  align-items: center;
+  padding: 0.8rem;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+}
+.submission-list article div {
+  display: grid;
+}
+@media (max-width: 800px) {
+  .class-hero {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .invite-compact {
+    width: 100%;
+  }
+  .class-overview {
+    grid-template-columns: 1fr;
+  }
+  .form-grid,
+  .class-overview dl,
+  .assignment-facts {
+    grid-template-columns: 1fr 1fr;
+  }
+  .assignment-list > article {
+    grid-template-columns: 1fr;
+  }
+  .member-list > div {
+    grid-template-columns: 2rem 1fr auto;
+  }
+  .member-list time {
+    display: none;
+  }
+}
+@media (max-width: 480px) {
+  .class-hero {
+    padding: 1.2rem;
+  }
+  .form-grid,
+  .class-overview dl,
+  .assignment-facts {
+    grid-template-columns: 1fr;
+  }
+  .assignment-section > header,
+  .assignment-form footer,
+  .join-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .assignment-form footer .button,
+  .join-actions .button {
+    width: 100%;
+  }
+  .member-search {
+    width: 100%;
+    margin: 0;
+  }
+  .member-search input {
+    width: 100%;
+  }
+  .submission-workspace > header,
+  .submission-filters {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .submission-list article {
+    grid-template-columns: 1fr 1fr;
+  }
+}

@@ -14,10 +14,10 @@ export interface FirebaseAuthGateway {
 }
 
 function realGateway():FirebaseAuthGateway{
- const credential=env.FIREBASE_CLIENT_EMAIL&&env.FIREBASE_PRIVATE_KEY
+ const credential=env.FIREBASE_PROJECT_ID&&env.FIREBASE_CLIENT_EMAIL&&env.FIREBASE_PRIVATE_KEY
   ?cert({projectId:env.FIREBASE_PROJECT_ID,clientEmail:env.FIREBASE_CLIENT_EMAIL,privateKey:env.FIREBASE_PRIVATE_KEY.replace(/\\n/g,"\n")})
   :applicationDefault();
- const app=getApps()[0]??initializeApp({credential,projectId:env.FIREBASE_PROJECT_ID});
+ const app=getApps()[0]??initializeApp({credential,...(env.FIREBASE_PROJECT_ID?{projectId:env.FIREBASE_PROJECT_ID}:{})});
  const auth=getAuth(app);
  return {
   verifyIdToken:token=>auth.verifyIdToken(token,true),

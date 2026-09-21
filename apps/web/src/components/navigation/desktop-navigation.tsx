@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { ThemeToggle } from "@/components/theme/theme-toggle";
 
 export const navigation = [
   { label: "Features", href: "#features" },
@@ -8,5 +9,5 @@ export const navigation = [
 ];
 
 export function DesktopNavigation() {
-  return <><nav className="desktop-nav" aria-label="Primary">{navigation.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}</nav><div className="desktop-actions"><Link className="text-link" href="/login">Sign in</Link><Link className="button button-small button-primary magnetic" href="/register"><span>Start teaching</span></Link></div></>;
+  return <><nav className="desktop-nav" aria-label="Primary">{navigation.map((item) => <Link key={item.href} href={item.href}>{item.label}</Link>)}</nav><div className="desktop-actions"><ThemeToggle compact /><Link className="text-link" href="/login">Sign in</Link><Link className="button button-small button-primary magnetic" href="/register"><span>Start teaching</span></Link></div></>;
 }

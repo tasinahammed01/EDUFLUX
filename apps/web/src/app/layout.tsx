@@ -4,6 +4,11 @@ import "./globals.css";
 import "./marketing.css";
 import "./interaction.css";
 import "./auth-firebase.css";
+import "./class-dialog.css";
+import "./class-workspace.css";
+import "./theme.css";
+import { ThemeProvider } from "@/components/theme/theme-provider";
+import { AppToaster } from "@/components/feedback/app-toaster";
 
 const manrope = Manrope({ subsets: ["latin"], variable: "--font-sans", display: "swap" });
 const instrumentSerif = Instrument_Serif({ subsets: ["latin"], variable: "--font-editorial", weight: "400", display: "swap" });
@@ -16,8 +21,16 @@ export const metadata: Metadata = {
   twitter: { card: "summary_large_image", title: "EduFlux", description: "Teaching intelligence, beautifully connected." }
 };
 
-export const viewport: Viewport = { width: "device-width", initialScale: 1, themeColor: "#030817", colorScheme: "dark" };
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#f3f7fb" },
+    { media: "(prefers-color-scheme: dark)", color: "#030817" },
+  ],
+  colorScheme: "light dark",
+};
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
-  return <html lang="en" data-scroll-behavior="smooth" className={`${manrope.variable} ${instrumentSerif.variable}`}><body>{children}</body></html>;
+  return <html lang="en" data-scroll-behavior="smooth" suppressHydrationWarning className={`${manrope.variable} ${instrumentSerif.variable}`}><body><ThemeProvider>{children}<AppToaster /></ThemeProvider></body></html>;
 }

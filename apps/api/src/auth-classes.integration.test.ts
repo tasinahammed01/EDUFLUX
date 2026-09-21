@@ -1,17 +1,417 @@
-import request,{type Agent}from"supertest";import{MongoMemoryReplSet}from"mongodb-memory-server";import{afterAll,afterEach,beforeAll,describe,expect,it,vi}from"vitest";import{app}from"./app.js";import{connectDatabase,disconnectDatabase}from"./config/database.js";import{UserModel}from"./modules/users/user.model.js";import{ClassModel}from"./modules/classes/class.model.js";import{ClassMembershipModel}from"./modules/classes/class-membership.model.js";import{authRateLimit,joinRateLimit}from"./modules/auth/rate-limits.js";import{ipKeyGenerator}from"express-rate-limit";
-let replicaSet:MongoMemoryReplSet;let sequence=0;const origin="http://localhost:3000";
-function token(input:Partial<{uid:string;email:string;name:string;auth_time:number;email_verified:boolean;firebase:{sign_in_provider:string}}>={}){const identity={uid:`uid-${++sequence}`,email:`person-${sequence}@example.com`,name:"Taylor Teacher",auth_time:Math.floor(Date.now()/1000),email_verified:true,firebase:{sign_in_provider:"password"},...input};return`test-id.${Buffer.from(JSON.stringify(identity)).toString("base64url")}`}
-async function csrf(agent:Agent){return(await agent.get("/api/v1/auth/csrf")).body.data.csrfToken as string}
-async function session(agent:Agent,persona?:"TEACHER"|"STUDENT",idToken=token()){const csrfToken=await csrf(agent);return agent.post("/api/v1/auth/session-login").set("origin",origin).set("x-csrf-token",csrfToken).send({idToken,...(persona?{primaryPersona:persona}:{})})}
-beforeAll(async()=>{replicaSet=await MongoMemoryReplSet.create({binary:{version:"8.2.6"},replSet:{count:1,storageEngine:"wiredTiger"}});await connectDatabase(replicaSet.getUri("eduflux-test"));await Promise.all([UserModel.createIndexes(),ClassModel.createIndexes(),ClassMembershipModel.createIndexes()])},120_000);
-afterEach(async()=>{vi.restoreAllMocks();for(const ip of["::ffff:127.0.0.1","::1"]){const key=ipKeyGenerator(ip);authRateLimit.resetKey(key);joinRateLimit.resetKey(key)}await Promise.all([UserModel.deleteMany({}),ClassModel.deleteMany({}),ClassMembershipModel.deleteMany({})])});afterAll(async()=>{await disconnectDatabase();await replicaSet.stop()});
-describe("Firebase session authentication",()=>{
- it("exchanges a recent verified token, upserts a safe user, and sets an HttpOnly cookie",async()=>{const agent=request.agent(app),response=await session(agent,"TEACHER",token({email:"Mixed.Email@Example.COM"}));expect(response.status).toBe(200);expect(response.body.data).toMatchObject({requiresOnboarding:false,user:{firebaseUid:expect.any(String),email:"Mixed.Email@Example.COM",primaryPersona:"TEACHER",platformRole:"USER"}});expect(response.headers["set-cookie"]?.[0]).toContain("eduflux.session=");expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");const stored=await UserModel.findOne({});expect(stored?.emailCanonical).toBeUndefined();expect(await UserModel.findOne({emailCanonical:"mixed.email@example.com"})).not.toBeNull();expect(JSON.stringify(stored)).not.toContain("passwordHash");expect((await agent.get("/api/v1/auth/session")).status).toBe(200)});
- it("rejects invalid and stale ID tokens and requires CSRF",async()=>{expect((await request(app).post("/api/v1/auth/session-login").send({idToken:token()})).status).toBe(403);const agent=request.agent(app),csrfToken=await csrf(agent);expect((await agent.post("/api/v1/auth/session-login").set("origin",origin).set("x-csrf-token",csrfToken).send({idToken:"invalid-token-that-is-long-enough"})).status).toBe(401);expect((await session(request.agent(app),"TEACHER",token({auth_time:Math.floor(Date.now()/1000)-360}))).body.error.code).toBe("AUTH_RECENT_REQUIRED")});
- it("reuses Firebase UID without overwriting role and sends Google users to onboarding",async()=>{const id=token({uid:"stable-uid",firebase:{sign_in_provider:"google.com"}});const first=request.agent(app);expect((await session(first,undefined,id)).body.data.requiresOnboarding).toBe(true);await UserModel.updateOne({firebaseUid:"stable-uid"},{platformRole:"ADMIN"});const second=request.agent(app);await session(second,"STUDENT",id);expect(await UserModel.countDocuments({firebaseUid:"stable-uid"})).toBe(1);expect((await UserModel.findOne({firebaseUid:"stable-uid"}))?.platformRole).toBe("ADMIN")});
- it("supports first-use onboarding, disabled users, logout, and revocation",async()=>{const agent=request.agent(app),id=token({uid:"lifecycle-uid"});await session(agent,undefined,id);let csrfToken=await csrf(agent);expect((await agent.post("/api/v1/auth/onboarding").set("origin",origin).set("x-csrf-token",csrfToken).send({primaryPersona:"STUDENT"})).status).toBe(200);csrfToken=await csrf(agent);expect((await agent.post("/api/v1/auth/logout-all").set("origin",origin).set("x-csrf-token",csrfToken)).status).toBe(200);expect((await agent.get("/api/v1/auth/session")).status).toBe(401);const disabled=request.agent(app);await UserModel.updateOne({firebaseUid:"lifecycle-uid"},{status:"DISABLED"});expect((await session(disabled,undefined,id)).status).toBe(403)});
+import request, { type Agent } from "supertest";
+import { MongoMemoryReplSet } from "mongodb-memory-server";
+import {
+  afterAll,
+  afterEach,
+  beforeAll,
+  describe,
+  expect,
+  it,
+  vi,
+} from "vitest";
+import { app } from "./app.js";
+import { connectDatabase, disconnectDatabase } from "./config/database.js";
+import { UserModel } from "./modules/users/user.model.js";
+import { ClassModel } from "./modules/classes/class.model.js";
+import { ClassMembershipModel } from "./modules/classes/class-membership.model.js";
+import { authRateLimit, joinRateLimit } from "./modules/auth/rate-limits.js";
+import { ipKeyGenerator } from "express-rate-limit";
+let replicaSet: MongoMemoryReplSet;
+let sequence = 0;
+const origin = "http://localhost:3000";
+function token(
+  input: Partial<{
+    uid: string;
+    email: string;
+    name: string;
+    auth_time: number;
+    email_verified: boolean;
+    firebase: { sign_in_provider: string };
+  }> = {},
+) {
+  const identity = {
+    uid: `uid-${++sequence}`,
+    email: `person-${sequence}@example.com`,
+    name: "Taylor Teacher",
+    auth_time: Math.floor(Date.now() / 1000),
+    email_verified: true,
+    firebase: { sign_in_provider: "password" },
+    ...input,
+  };
+  return `test-id.${Buffer.from(JSON.stringify(identity)).toString("base64url")}`;
+}
+async function csrf(agent: Agent) {
+  return (await agent.get("/api/v1/auth/csrf")).body.data.csrfToken as string;
+}
+async function session(
+  agent: Agent,
+  persona?: "TEACHER" | "STUDENT",
+  idToken = token(),
+) {
+  const csrfToken = await csrf(agent);
+  return agent
+    .post("/api/v1/auth/session-login")
+    .set("origin", origin)
+    .set("x-csrf-token", csrfToken)
+    .send({ idToken, ...(persona ? { primaryPersona: persona } : {}) });
+}
+beforeAll(async () => {
+  replicaSet = await MongoMemoryReplSet.create({
+    binary: { version: "8.2.6" },
+    replSet: { count: 1, storageEngine: "wiredTiger" },
+  });
+  await connectDatabase(replicaSet.getUri("eduflux-test"));
+  await Promise.all([
+    UserModel.createIndexes(),
+    ClassModel.createIndexes(),
+    ClassMembershipModel.createIndexes(),
+  ]);
+}, 120_000);
+afterEach(async () => {
+  vi.restoreAllMocks();
+  for (const ip of ["::ffff:127.0.0.1", "::1"]) {
+    const key = ipKeyGenerator(ip);
+    authRateLimit.resetKey(key);
+    joinRateLimit.resetKey(key);
+  }
+  await Promise.all([
+    UserModel.deleteMany({}),
+    ClassModel.deleteMany({}),
+    ClassMembershipModel.deleteMany({}),
+  ]);
 });
-describe("class membership compatibility",()=>{
- it("preserves teacher creation, student join, and member authorization",async()=>{const teacher=request.agent(app);await session(teacher,"TEACHER");let csrfToken=await csrf(teacher);const created=await teacher.post("/api/v1/classes").set("origin",origin).set("x-csrf-token",csrfToken).send({name:"Literature"});expect(created.status).toBe(201);const student=request.agent(app);await session(student,"STUDENT");csrfToken=await csrf(student);expect((await student.post("/api/v1/classes/join").set("origin",origin).set("x-csrf-token",csrfToken).send({joinCode:created.body.data.joinCode})).status).toBe(201);expect((await student.get(`/api/v1/classes/${created.body.data.id}/members`)).status).toBe(403);expect((await teacher.get(`/api/v1/classes/${created.body.data.id}/members`)).body.data.members).toHaveLength(2)});
- it("keeps required indexes and transactional rollback",async()=>{const teacher=request.agent(app);await session(teacher,"TEACHER");let csrfToken=await csrf(teacher);vi.spyOn(ClassMembershipModel.prototype,"save").mockRejectedValueOnce(new Error("forced"));expect((await teacher.post("/api/v1/classes").set("origin",origin).set("x-csrf-token",csrfToken).send({name:"Rollback"})).status).toBe(500);expect(await ClassModel.countDocuments()).toBe(0);const indexes=await UserModel.collection.indexes();expect(indexes.some(index=>index.name==="user_firebase_uid_unique"&&index.unique)).toBe(true)});
+afterAll(async () => {
+  await disconnectDatabase();
+  await replicaSet.stop();
+});
+describe("Firebase session authentication", () => {
+  it("exchanges a recent verified token, upserts a safe user, and sets an HttpOnly cookie", async () => {
+    const agent = request.agent(app),
+      response = await session(
+        agent,
+        "TEACHER",
+        token({ email: "Mixed.Email@Example.COM" }),
+      );
+    expect(response.status).toBe(200);
+    expect(response.body.data).toMatchObject({
+      requiresOnboarding: false,
+      user: {
+        firebaseUid: expect.any(String),
+        email: "Mixed.Email@Example.COM",
+        primaryPersona: "TEACHER",
+        platformRole: "USER",
+      },
+    });
+    expect(response.headers["set-cookie"]?.[0]).toContain("eduflux.session=");
+    expect(response.headers["set-cookie"]?.[0]).toContain("HttpOnly");
+    const stored = await UserModel.findOne({});
+    expect(stored?.emailCanonical).toBeUndefined();
+    expect(
+      await UserModel.findOne({ emailCanonical: "mixed.email@example.com" }),
+    ).not.toBeNull();
+    expect(JSON.stringify(stored)).not.toContain("passwordHash");
+    expect((await agent.get("/api/v1/auth/session")).status).toBe(200);
+  });
+  it("rejects invalid and stale ID tokens and requires CSRF", async () => {
+    expect(
+      (
+        await request(app)
+          .post("/api/v1/auth/session-login")
+          .send({ idToken: token() })
+      ).status,
+    ).toBe(403);
+    const agent = request.agent(app),
+      csrfToken = await csrf(agent);
+    expect(
+      (
+        await agent
+          .post("/api/v1/auth/session-login")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+          .send({ idToken: "invalid-token-that-is-long-enough" })
+      ).status,
+    ).toBe(401);
+    expect(
+      (
+        await session(
+          request.agent(app),
+          "TEACHER",
+          token({ auth_time: Math.floor(Date.now() / 1000) - 360 }),
+        )
+      ).body.error.code,
+    ).toBe("AUTH_RECENT_REQUIRED");
+  });
+  it("reuses Firebase UID without overwriting role and sends Google users to onboarding", async () => {
+    const id = token({
+      uid: "stable-uid",
+      firebase: { sign_in_provider: "google.com" },
+    });
+    const first = request.agent(app);
+    expect(
+      (await session(first, undefined, id)).body.data.requiresOnboarding,
+    ).toBe(true);
+    await UserModel.updateOne(
+      { firebaseUid: "stable-uid" },
+      { platformRole: "ADMIN" },
+    );
+    const second = request.agent(app);
+    await session(second, "STUDENT", id);
+    expect(await UserModel.countDocuments({ firebaseUid: "stable-uid" })).toBe(
+      1,
+    );
+    expect(
+      (await UserModel.findOne({ firebaseUid: "stable-uid" }))?.platformRole,
+    ).toBe("ADMIN");
+  });
+  it("supports first-use onboarding, disabled users, logout, and revocation", async () => {
+    const agent = request.agent(app),
+      id = token({ uid: "lifecycle-uid" });
+    await session(agent, undefined, id);
+    let csrfToken = await csrf(agent);
+    expect(
+      (
+        await agent
+          .post("/api/v1/auth/onboarding")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+          .send({ primaryPersona: "STUDENT" })
+      ).status,
+    ).toBe(200);
+    csrfToken = await csrf(agent);
+    expect(
+      (
+        await agent
+          .post("/api/v1/auth/logout-all")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+      ).status,
+    ).toBe(200);
+    expect((await agent.get("/api/v1/auth/session")).status).toBe(401);
+    const disabled = request.agent(app);
+    await UserModel.updateOne(
+      { firebaseUid: "lifecycle-uid" },
+      { status: "DISABLED" },
+    );
+    expect((await session(disabled, undefined, id)).status).toBe(403);
+  });
+});
+describe("class membership compatibility", () => {
+  it("keeps legacy class documents valid without the new optional fields", async () => {
+    await expect(
+      new ClassModel({
+        name: "Legacy class",
+        joinCode: "LEGACY24",
+        status: "ACTIVE",
+      }).validate(),
+    ).resolves.toBeUndefined();
+  });
+  it("preserves teacher creation, student join, and member authorization", async () => {
+    const teacher = request.agent(app);
+    await session(teacher, "TEACHER");
+    let csrfToken = await csrf(teacher);
+    const created = await teacher
+      .post("/api/v1/classes")
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken)
+      .send({
+        name: "Literature",
+        subjectLevel: "English Literature",
+        startDate: "2026-09-20",
+        endDate: "2027-05-30",
+        description: "Close reading.",
+      });
+    expect(created.status).toBe(201);
+    expect(created.body.data).toMatchObject({
+      subjectLevel: "English Literature",
+      startDate: "2026-09-20",
+      endDate: "2027-05-30",
+      role: "OWNER",
+      memberCount: 1,
+    });
+    expect(created.body.data.inviteToken).toEqual(expect.any(String));
+    expect(created.body.data.joinUrl).toContain(
+      `/join/${created.body.data.inviteToken}`,
+    );
+    const student = request.agent(app);
+    await session(student, "STUDENT");
+    csrfToken = await csrf(student);
+    expect(
+      (
+        await student
+          .post("/api/v1/classes/join")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+          .send({ joinCode: created.body.data.joinCode })
+      ).status,
+    ).toBe(201);
+    const studentRoster = await student.get(
+      `/api/v1/classes/${created.body.data.id}/members`,
+    );
+    expect(studentRoster.status).toBe(200);
+    expect(
+      studentRoster.body.data.members.every(
+        (member: { email?: string }) => !member.email,
+      ),
+    ).toBe(true);
+    expect(
+      (await teacher.get(`/api/v1/classes/${created.body.data.id}/members`))
+        .body.data.members,
+    ).toHaveLength(2);
+  });
+  it("supports confirmed invite joining, rotation, assignment publishing, and draft privacy", async () => {
+    const teacher = request.agent(app);
+    await session(teacher, "TEACHER");
+    let csrfToken = await csrf(teacher);
+    const created = await teacher
+      .post("/api/v1/classes")
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken)
+      .send({
+        name: "Writing",
+        subjectLevel: "Academic Writing",
+        startDate: "2026-09-20",
+      });
+    const classId = created.body.data.id,
+      token = created.body.data.inviteToken;
+    expect(
+      (await request(app).get(`/api/v1/classes/join/${token}/preview`)).body
+        .data,
+    ).toMatchObject({ name: "Writing", teacher: { role: "OWNER" } });
+    const student = request.agent(app);
+    await session(student, "STUDENT");
+    csrfToken = await csrf(student);
+    expect(
+      (
+        await student
+          .post(`/api/v1/classes/join/${token}`)
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await student
+          .post(`/api/v1/classes/join/${token}`)
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+      ).status,
+    ).toBe(201);
+    csrfToken = await csrf(teacher);
+    const draft = await teacher
+      .post(`/api/v1/classes/${classId}/assignments`)
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken)
+      .send({
+        title: "Persuasive essay",
+        description: "Write an essay.",
+        maxScore: 100,
+        allowLateSubmission: false,
+        allowResubmission: true,
+        showMarks: true,
+        resourceLinks: [],
+      });
+    expect(draft.status).toBe(201);
+    expect(draft.body.data.status).toBe("DRAFT");
+    expect(
+      (await student.get(`/api/v1/classes/${classId}/assignments`)).body.data
+        .assignments,
+    ).toHaveLength(0);
+    csrfToken = await csrf(teacher);
+    expect(
+      (
+        await teacher
+          .post(
+            `/api/v1/classes/${classId}/assignments/${draft.body.data.id}/publish`,
+          )
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+      ).body.data.status,
+    ).toBe("PUBLISHED");
+    expect(
+      (await student.get(`/api/v1/classes/${classId}/assignments`)).body.data
+        .assignments,
+    ).toHaveLength(1);
+    const rotated = await teacher
+      .post(`/api/v1/classes/${classId}/invite/rotate`)
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken);
+    expect(rotated.body.data.inviteToken).not.toBe(token);
+    expect(
+      (await request(app).get(`/api/v1/classes/join/${token}/preview`)).status,
+    ).toBe(404);
+  });
+  it("keeps required indexes and transactional rollback", async () => {
+    const teacher = request.agent(app);
+    await session(teacher, "TEACHER");
+    let csrfToken = await csrf(teacher);
+    vi.spyOn(ClassMembershipModel.prototype, "save").mockRejectedValueOnce(
+      new Error("forced"),
+    );
+    expect(
+      (
+        await teacher
+          .post("/api/v1/classes")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+          .send({
+            name: "Rollback",
+            subjectLevel: "General",
+            startDate: "2026-09-20",
+          })
+      ).status,
+    ).toBe(500);
+    expect(await ClassModel.countDocuments()).toBe(0);
+    const indexes = await UserModel.collection.indexes();
+    expect(
+      indexes.some(
+        (index) => index.name === "user_firebase_uid_unique" && index.unique,
+      ),
+    ).toBe(true);
+  });
+  it("rejects invalid dates, ownership fields, and student class creation", async () => {
+    const teacher = request.agent(app);
+    await session(teacher, "TEACHER");
+    let csrfToken = await csrf(teacher);
+    const invalid = await teacher
+      .post("/api/v1/classes")
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken)
+      .send({
+        name: "Literature",
+        subjectLevel: "English",
+        startDate: "2026-09-20",
+        endDate: "2026-09-19",
+      });
+    expect(invalid.status).toBe(400);
+    expect(invalid.body.error.fields.endDate).toContain(
+      "End date cannot be earlier than start date.",
+    );
+    const ownership = await teacher
+      .post("/api/v1/classes")
+      .set("origin", origin)
+      .set("x-csrf-token", csrfToken)
+      .send({
+        name: "Literature",
+        subjectLevel: "English",
+        startDate: "2026-09-20",
+        ownerId: "someone-else",
+      });
+    expect(ownership.status).toBe(400);
+    const student = request.agent(app);
+    await session(student, "STUDENT");
+    csrfToken = await csrf(student);
+    expect(
+      (
+        await student
+          .post("/api/v1/classes")
+          .set("origin", origin)
+          .set("x-csrf-token", csrfToken)
+          .send({
+            name: "Literature",
+            subjectLevel: "English",
+            startDate: "2026-09-20",
+          })
+      ).status,
+    ).toBe(403);
+  });
 });

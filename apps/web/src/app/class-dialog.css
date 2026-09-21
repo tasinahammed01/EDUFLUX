@@ -1,0 +1,204 @@
+.google-auth-button {
+  border-color: #d7dde7;
+  color: #172033;
+  transition:
+    background 0.2s ease,
+    border-color 0.2s ease,
+    transform 0.2s ease;
+}
+.google-auth-button:hover:not(:disabled) {
+  border-color: #b6c1d1;
+  background: #f3f6fa;
+  transform: translateY(-1px);
+}
+.google-auth-button:active:not(:disabled) {
+  background: #e9eef5;
+  transform: none;
+}
+.google-auth-button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 3px;
+}
+.google-auth-button:disabled {
+  cursor: not-allowed;
+  color: #364158;
+  background: #eef1f5;
+  opacity: 0.78;
+}
+.class-card > .class-subject {
+  margin-bottom: 0.45rem;
+  color: var(--cyan);
+  font-weight: 700;
+}
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: clamp(1rem, 4vw, 2rem);
+  background: rgba(1, 5, 14, 0.78);
+  backdrop-filter: blur(5px);
+}
+.create-class-dialog {
+  width: min(40rem, 100%);
+  max-height: calc(100dvh - 2rem);
+  overflow-y: auto;
+  border: 1px solid rgba(158, 190, 225, 0.2);
+  border-radius: 1rem;
+  background: #09152b;
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+}
+.create-class-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1.5rem;
+  padding: 1.7rem 1.7rem 1.3rem;
+  border-bottom: 1px solid var(--border);
+}
+.create-class-dialog .eyebrow {
+  margin-bottom: 0.6rem;
+}
+.create-class-dialog h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.45rem;
+  letter-spacing: -0.03em;
+}
+.create-class-dialog header p:last-child {
+  max-width: 30rem;
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.6;
+}
+.dialog-close {
+  display: grid;
+  flex: 0 0 2.4rem;
+  height: 2.4rem;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  color: var(--muted);
+  background: #071127;
+  cursor: pointer;
+}
+.dialog-close svg {
+  width: 1rem;
+}
+.create-class-dialog form {
+  display: grid;
+  gap: 1.15rem;
+  padding: 1.5rem 1.7rem 1.7rem;
+}
+.dialog-fields {
+  display: grid;
+  gap: 1rem;
+}
+.dialog-fields.two-column {
+  grid-template-columns: 1fr 1fr;
+}
+.dialog-field {
+  display: grid;
+  gap: 0.45rem;
+  color: #d8e1ed;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+.dialog-field span small {
+  color: var(--muted);
+  font-weight: 500;
+}
+.dialog-field input,
+.dialog-field select,
+.dialog-field textarea {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 0.6rem;
+  color: var(--foreground);
+  background: #061127;
+  font: inherit;
+  font-weight: 500;
+}
+.dialog-field input,
+.dialog-field select {
+  min-height: 2.85rem;
+  padding: 0.65rem 0.75rem;
+}
+.dialog-field textarea {
+  resize: vertical;
+  padding: 0.75rem;
+  line-height: 1.5;
+}
+.dialog-field input:focus,
+.dialog-field select:focus,
+.dialog-field textarea:focus {
+  border-color: rgba(66, 223, 245, 0.65);
+  outline: 2px solid rgba(66, 223, 245, 0.18);
+  outline-offset: 1px;
+}
+.dialog-field [aria-invalid="true"] {
+  border-color: #e87888;
+}
+.dialog-field .field-error {
+  color: #ff9dab;
+  font-size: 0.62rem;
+}
+.character-count {
+  justify-self: end;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-weight: 500;
+}
+.create-class-dialog footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding-top: 0.35rem;
+}
+.create-class-dialog .form-error {
+  margin: 0;
+}
+.create-class-dialog button:disabled {
+  cursor: not-allowed;
+  opacity: 0.68;
+}
+@media (max-width: 600px) {
+  .dashboard-heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 1.25rem;
+  }
+  .dashboard-heading > .button {
+    width: 100%;
+  }
+  .dialog-backdrop {
+    align-items: end;
+    padding: 0.65rem;
+  }
+  .create-class-dialog {
+    max-height: calc(100dvh - 1.3rem);
+    border-radius: 0.9rem;
+  }
+  .create-class-dialog > header {
+    padding: 1.25rem;
+  }
+  .create-class-dialog form {
+    padding: 1.2rem;
+  }
+  .dialog-fields.two-column {
+    grid-template-columns: 1fr;
+  }
+  .create-class-dialog footer {
+    position: sticky;
+    bottom: -1.2rem;
+    margin: 0 -1.2rem -1.2rem;
+    padding: 1rem 1.2rem;
+    background: #09152b;
+  }
+  .create-class-dialog footer .button {
+    flex: 1;
+  }
+}
