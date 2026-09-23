@@ -41,7 +41,7 @@
   --background-soft: #eaf1f8;
   --surface: #ffffff;
   --surface-elevated: #ffffff;
-  --surface-raised: #ffffff;
+  --surface-raised: #f8fbfd;
   --surface-muted: #edf3f8;
   --foreground: #10223a;
   --muted: #596b81;
@@ -168,9 +168,6 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
 .theme-menu button[aria-checked="true"] { background: var(--sidebar-active); }
 .theme-menu svg { width: 1rem; height: 1rem; }
 .theme-menu button svg:last-child { color: var(--brand); }
-.app-sidebar-theme { margin-top: auto; padding: 0 .35rem .75rem; }
-.app-sidebar-theme .theme-trigger { width: 100%; }
-.app-sidebar-theme + .app-profile { margin-top: 0; }
 
 /* Keep the CSS open state authoritative if the optional GSAP menu timeline is late. */
 .menu-overlay.is-open .menu-panel { transform: translateX(0) !important; clip-path: inset(0) !important; }
@@ -224,17 +221,36 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
 .light .app-shell { background: var(--background); }
 .light .app-sidebar,
 .light .app-mobile-header { background: var(--sidebar-background); }
+.light .app-topbar { background: var(--surface); border-color: var(--border); }
 .light .app-profile,
 .light .class-card,
 .light .member-panel,
 .light .workspace-card,
 .light .assignment-card { background: var(--surface); box-shadow: var(--shadow-soft); }
+.light .app-profile-trigger:hover { background: var(--surface-muted); }
+.light .app-profile-dropdown { background: var(--surface-elevated); border-color: var(--border-strong); }
+.light .app-profile-dropdown-header strong { color: var(--foreground); }
+.light .app-profile-dropdown-header small { color: var(--foreground-muted); }
+.light .app-profile-dropdown-divider { background: var(--border); }
+.light .app-profile-dropdown-item:hover { background: var(--surface-muted); }
 .light .app-sidebar nav a.active { color: var(--foreground); background: var(--sidebar-active); }
 .light .class-skeletons i { background: linear-gradient(90deg,#e6edf4,#f8fbfd,#e6edf4); background-size: 200% 100%; }
 .light .class-action { background: linear-gradient(135deg,#ffffff,#edf3f8); }
 .light .class-hero { background: linear-gradient(135deg,#ffffff,#eaf1f8); }
 .light .class-facts span { color: var(--foreground-muted); background: var(--surface-muted); }
 .light .invite-compact strong { color: var(--brand); }
+.light .class-cover { background: linear-gradient(135deg,#f8fafc,#edf3f8); }
+.light .dashboard-controls { background: var(--surface); border-color: var(--border); }
+.light .dashboard-search input { background: var(--input-background); border-color: var(--border); }
+.light .dashboard-tabs button { color: var(--foreground-muted); }
+.light .dashboard-tabs button:hover { background: var(--surface-muted); }
+.light .dashboard-tabs button[aria-pressed="true"] { background: var(--sidebar-active); }
+.light .class-card-menu button:hover { background: var(--surface-muted); }
+.light .class-card-dropdown { background: var(--surface-elevated); border-color: var(--border-strong); }
+.light .class-card-dropdown button:hover { background: var(--surface-muted); }
+.light .class-card-dropdown-divider { background: var(--border); }
+.light .class-card-dropdown-item-destructive { color: var(--danger); }
+.light .class-card-dropdown-item-destructive:hover { background: color-mix(in srgb,var(--danger) 12%,transparent); }
 .light .class-overview > article,
 .light .invite-panel,
 .light .settings-panel,
@@ -250,6 +266,56 @@ input[type="checkbox"]:disabled { cursor: not-allowed; opacity: .55; }
 .light .dialog-field select,
 .light .dialog-field textarea { color: var(--foreground); background: var(--input-background); }
 .light .danger-zone { color: var(--danger); border-color: color-mix(in srgb,var(--danger) 35%,transparent); }
+
+/* Assignment Card Light Theme */
+.light .assignment-card {
+  background: var(--surface);
+  border-color: var(--border);
+}
+
+.light .assignment-card:hover {
+  border-color: var(--border-strong);
+}
+
+.light .assignment-card-description {
+  color: var(--foreground-muted);
+}
+
+.light .assignment-card-meta {
+  color: var(--foreground-muted);
+}
+
+/* Submissions Dialog Light Theme */
+.light .submissions-dialog {
+  background: var(--dialog-background);
+  border-color: var(--border-strong);
+}
+
+.light .submissions-dialog-header {
+  border-color: var(--border);
+}
+
+.light .submissions-dialog-close {
+  background: var(--surface-muted);
+  border-color: var(--border);
+  color: var(--foreground-muted);
+}
+
+.light .submissions-dialog-close:hover {
+  background: var(--surface-raised);
+}
+
+.light .submission-row {
+  border-color: var(--border);
+}
+
+.light .submission-row:hover {
+  background: var(--surface-muted);
+}
+
+.light .submissions-dialog-footer {
+  border-color: var(--border);
+}
 
 .class-overview dl div { border: 1px solid var(--stat-border); color: var(--stat-value); background: var(--stat-background); box-shadow: var(--shadow-soft); }
 .class-overview dt { color: var(--stat-label); }

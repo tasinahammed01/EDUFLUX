@@ -12,6 +12,9 @@ export interface SubmissionAttemptRecord {
   submittedAt: Date;
   isLate: boolean;
   rubricVersion?: number;
+  rubricRevisionId?: Types.ObjectId;
+  rubricRevisionNumber?: number;
+  rubricHash?: string;
   createdAt: Date;
 }
 const schema = new Schema<SubmissionAttemptRecord>(
@@ -38,6 +41,9 @@ const schema = new Schema<SubmissionAttemptRecord>(
     submittedAt: { type: Date, required: true },
     isLate: { type: Boolean, required: true },
     rubricVersion: Number,
+    rubricRevisionId: { type: Schema.Types.ObjectId, ref: "RubricRevision" },
+    rubricRevisionNumber: { type: Number, min: 1 },
+    rubricHash: { type: String, minlength: 64, maxlength: 64 },
   },
   {
     timestamps: { createdAt: true, updatedAt: false },
@@ -52,6 +58,10 @@ schema.index(
 schema.index(
   { assignmentId: 1, submittedAt: -1 },
   { name: "attempt_assignment_submitted" },
+);
+schema.index(
+  { rubricRevisionId: 1, assignmentId: 1 },
+  { sparse: true, name: "attempt_rubric_revision_assignment" },
 );
 schema.index(
   { assignmentId: 1, isLate: 1, submittedAt: -1 },

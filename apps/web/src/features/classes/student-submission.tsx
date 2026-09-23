@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { SubmissionDto } from "@eduflux/shared-types";
 import { classesApi } from "@/lib/api/classes";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
@@ -13,6 +15,7 @@ export function StudentSubmission({
   classId: string;
   assignmentId: string;
 }) {
+  const router = useRouter();
   const [submission, setSubmission] = useState<SubmissionDto | null>(null);
   const [text, setText] = useState("");
   const [saving, setSaving] = useState(false);
@@ -135,7 +138,8 @@ export function StudentSubmission({
               <strong>Attempt {attempt.attemptNumber}</strong>
               <time>{new Date(attempt.submittedAt).toLocaleString()}</time>
               {attempt.isLate && <span>Late</span>}
-              <p>{attempt.typedText || "No written response."}</p>
+              <p>{attempt.typedText ? "Written response" : "No typed response"}{attempt.files.length ? ` · ${attempt.files.length} file${attempt.files.length === 1 ? "" : "s"}` : ""}</p>
+              <Link className="button button-secondary button-small" href={`/student/classes/${classId}/assignments/${assignmentId}/submissions/${submission.id}/attempts/${attempt.id}`}>View Review</Link>
             </article>
           ))}
         </div>
@@ -147,13 +151,12 @@ export function StudentSubmission({
         confirmLabel="Submit attempt"
         onCancel={() => setConfirming(false)}
         onConfirm={async () => {
-          const value = await classesApi.submitAssignment(
+          const result = await classesApi.submitAssignment(
             classId,
             assignmentId,
           );
-          setSubmission(value);
-          setText(value.draftText);
           notify.success("Assignment submitted.");
+          router.replace(`/student/classes/${classId}/assignments/${assignmentId}/submissions/${result.submission.id}/attempts/${result.attempt.id}`);
         }}
       />
     </section>

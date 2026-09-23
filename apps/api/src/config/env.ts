@@ -69,9 +69,32 @@ const schema = z
       .min(1)
       .default(50 * 1024 * 1024),
     SUBMISSION_MAX_FILES: z.coerce.number().int().min(1).max(10).default(5),
+    AI_PROVIDER: z.enum(["openai", "openrouter", "gemini"]).default("openai"),
+    AI_API_KEY: optionalString(z.string().min(20)),
+    OPENROUTER_API_KEY: optionalString(z.string().min(20)),
+    OPENROUTER_BASE_URL: z.url().default("https://openrouter.ai/api/v1"),
+    AI_RUBRIC_MODEL: z.string().min(1).max(120).default("gpt-4o-mini"),
+    AI_EVALUATION_MODEL: z.string().min(1).max(120).default("gpt-4o-mini"),
+    OCR_PROVIDER: z.enum(["openai", "google-vision"]).default("google-vision"),
+    OCR_API_KEY: optionalString(z.string().min(20)),
+    OCR_MODEL: z.string().min(1).max(120).default("gpt-4o-mini"),
+    OCR_LANGUAGE_HINTS: z.preprocess((value) => typeof value === "string" ? value.split(",").map((item) => item.trim()).filter(Boolean) : value, z.array(z.string().min(2).max(20)).max(10)).default(["en"]),
+    OCR_ENABLE_HANDWRITING: z.preprocess((value) => typeof value === "string" ? value.toLowerCase() === "true" : value, z.boolean()).default(true),
+    AI_REQUEST_TIMEOUT_MS: z.coerce
+      .number()
+      .int()
+      .min(1_000)
+      .max(60_000)
+      .default(20_000),
   })
   .superRefine((value, context) => {
     if (value.NODE_ENV === "test") return;
+    if (value.AI_PROVIDER === "openrouter" && !value.OPENROUTER_API_KEY) {
+      context.addIssue({ code: "custom", message: "OPENROUTER_API_KEY is required when AI_PROVIDER=openrouter.", path: ["OPENROUTER_API_KEY"] });
+    }
+    if (value.OCR_PROVIDER === "google-vision" && !value.GOOGLE_APPLICATION_CREDENTIALS) {
+      context.addIssue({ code: "custom", message: "GOOGLE_APPLICATION_CREDENTIALS is required when OCR_PROVIDER=google-vision.", path: ["GOOGLE_APPLICATION_CREDENTIALS"] });
+    }
     const explicitCredentialCount = [
       value.FIREBASE_PROJECT_ID,
       value.FIREBASE_CLIENT_EMAIL,

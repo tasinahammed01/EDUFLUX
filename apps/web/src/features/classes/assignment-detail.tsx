@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowLeft, ExternalLink } from "lucide-react";
 import type { AssignmentDto } from "@eduflux/shared-types";
 import { classesApi } from "@/lib/api/classes";
-import { StudentSubmission } from "./student-submission";
+import { StudentSubmissionDialog } from "./student-submission-dialog";
 import { TeacherSubmissions } from "./teacher-submissions";
 export function AssignmentDetail({
   classId,
@@ -17,6 +17,7 @@ export function AssignmentDetail({
 }) {
   const [item, setItem] = useState<AssignmentDto | null>(null),
     [error, setError] = useState("");
+  const [submissionOpen, setSubmissionOpen] = useState(false);
   useEffect(() => {
     classesApi
       .assignment(classId, assignmentId)
@@ -51,14 +52,20 @@ export function AssignmentDetail({
           {item.rubric.criteria.map((criterion) => (
             <article key={criterion.id}>
               <strong>{criterion.title}</strong>
-              <span>{criterion.maxPoints} points</span>
+              <span>Weight: {criterion.weight}</span>
               {criterion.description && <p>{criterion.description}</p>}
             </article>
           ))}
         </section>
       )}
       {mode === "student" && (
-        <StudentSubmission classId={classId} assignmentId={assignmentId} />
+        <section className="assignment-submit-summary">
+          <h2>Your submission</h2>
+          <p>Submit a typed response, images, PDFs, or a combination in the submission dialog.</p>
+          <button className="button button-primary" type="button" onClick={() => setSubmissionOpen(true)}>
+            {item.studentSubmission?.submissionState === "DRAFT" ? "Continue Submission" : item.studentSubmission?.canResubmit ? "Submit Another Attempt" : "Submit Assignment"}
+          </button>
+        </section>
       )}
       {mode === "teacher" && item.status === "PUBLISHED" && (
         <TeacherSubmissions classId={classId} assignmentId={assignmentId} />
@@ -115,6 +122,7 @@ export function AssignmentDetail({
           Publish assignment
         </button>
       )}
+      {mode === "student" && submissionOpen && <StudentSubmissionDialog assignment={item} classId={classId} onClose={() => setSubmissionOpen(false)} />}
     </main>
   );
 }

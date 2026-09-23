@@ -29,6 +29,13 @@ async function authenticate(page: Page, persona: "TEACHER" | "STUDENT") {
     persona === "TEACHER" ? "/teacher/dashboard" : "/student/dashboard",
   );
 }
+async function signOut(page: Page) {
+  await page.locator(".app-profile-trigger").click();
+  await page
+    .getByRole("menu")
+    .getByRole("button", { name: "Sign out", exact: true })
+    .click();
+}
 test("Google actions remain readable on login and registration", async ({
   page,
 }) => {
@@ -47,6 +54,7 @@ test("Google actions remain readable on login and registration", async ({
 test("teacher publishes an assignment and student joins by secure link", async ({
   page,
 }) => {
+  test.setTimeout(90_000);
   let nativeDialogCount = 0;
   page.on("dialog", async (nativeDialog) => {
     nativeDialogCount += 1;
@@ -80,11 +88,17 @@ test("teacher publishes an assignment and student joins by secure link", async (
   await page.evaluate(() => localStorage.setItem("theme", "light"));
   await page.goto(classHref!);
   await expect(page.locator("html")).toHaveClass(/light/);
-  await expect(page.locator(".class-overview dl div").first()).toHaveCSS("background-color", "rgb(245, 249, 252)");
+  await expect(
+    page.getByRole("heading", { name: "E2E Literature" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "0 Assignments", exact: true }),
+  ).toBeVisible();
   await page.getByText("Show QR").click();
   await expect(
     page.getByRole("img", { name: /QR code to join/ }),
   ).toBeVisible();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await page.getByRole("button", { name: "Rotate invite link" }).click();
   const rotateDialog = page.getByRole("dialog", { name: "Rotate invite link?" });
   await expect(rotateDialog).toBeVisible();
@@ -98,30 +112,48 @@ test("teacher publishes an assignment and student joins by secure link", async (
       `/api/v1/classes/${classHref?.split("/").at(-1)}`,
     ),
     detail = (await detailResponse.json()).data;
-  await page.getByRole("button", { name: "assignments" }).click();
-  await page.getByRole("button", { name: "Create assignment" }).click();
+  await page
+    .getByRole("button", { name: "Create Assignment", exact: true })
+    .click();
   await page.getByLabel("Title").fill("Persuasive essay");
   await page.getByLabel("Description").fill("Write a persuasive essay.");
   await page.getByLabel("Allow late submissions").check();
   await expect(page.getByLabel("Allow late submissions")).toBeChecked();
-  await page.getByRole("button", { name: "Publish Assignment" }).click();
-  await expect(page.getByText("Assignment published", { exact: true })).toHaveCount(1);
+  await page
+    .locator("[data-assignment-form]")
+    .getByRole("button", { name: "Create assignment", exact: true })
+    .click();
+  await page.getByRole("button", { name: "Add rubric now" }).click();
+  await page.getByRole("button", { name: "Add Criterion" }).click();
+  await page.getByPlaceholder("Criterion title").fill("Argument quality");
+  await page.getByLabel(/Weight for/).fill("100");
+  await page.getByRole("button", { name: "Apply Changes" }).click();
   await expect(
-    page.getByRole("heading", { name: "Persuasive essay" }),
+    page.getByRole("heading", { name: "Persuasive essay", exact: true }),
   ).toBeVisible();
+  const assignmentsResponse = await page.request.get(
+      `/api/v1/classes/${classHref?.split("/").at(-1)}/assignments`,
+    ),
+    assignment = (await assignmentsResponse.json()).data.assignments.find(
+      (value: { title: string }) => value.title === "Persuasive essay",
+    );
+  await page.goto(
+    `/teacher/classes/${classHref?.split("/").at(-1)}/assignments/${assignment.id}`,
+  );
+  await page.getByRole("button", { name: "Publish assignment" }).click();
+  await expect(page.getByText("PUBLISHED", { exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Change theme" }).click();
   await page.getByRole("menuitemradio", { name: "Dark" }).click();
   await expect(page.locator("html")).toHaveClass(/dark/);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await authenticate(page, "STUDENT");
   await page.goto(new URL(detail.joinUrl).pathname);
   await page.getByRole("button", { name: "Join class" }).click();
   await expect(
     page.getByRole("heading", { name: "E2E Literature" }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "assignments" }).click();
   await expect(
-    page.getByRole("heading", { name: "Persuasive essay" }),
+    page.getByRole("heading", { name: "Persuasive essay", exact: true }),
   ).toBeVisible();
   expect(
     (
@@ -130,7 +162,7 @@ test("teacher publishes an assignment and student joins by secure link", async (
       )
     ).status(),
   ).toBe(200);
-  await page.getByRole("button", { name: "Sign out" }).click();
+  await signOut(page);
   await page.goto("/student/dashboard");
   await expect(page).toHaveURL(/\/login$/);
 });

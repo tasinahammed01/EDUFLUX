@@ -6,6 +6,7 @@ import "./interaction.css";
 import "./auth-firebase.css";
 import "./class-dialog.css";
 import "./class-workspace.css";
+import "./teacher-workspace.css";
 import "./theme.css";
 import { ThemeProvider } from "@/components/theme/theme-provider";
 import { AppToaster } from "@/components/feedback/app-toaster";

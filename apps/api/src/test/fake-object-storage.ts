@@ -4,6 +4,7 @@ import type {
 } from "../storage/object-storage.js";
 export class FakeObjectStorage implements ObjectStorage {
   objects = new Map<string, StoredObjectHead>();
+  bodies = new Map<string, Uint8Array>();
   deleted: string[] = [];
   async createUploadUrl({ key }: { key: string }) {
     return `https://storage.test/upload/${encodeURIComponent(key)}`;
@@ -17,5 +18,10 @@ export class FakeObjectStorage implements ObjectStorage {
   async deleteObject(key: string) {
     this.objects.delete(key);
     this.deleted.push(key);
+  }
+  async getObject(key: string) {
+    const body = this.bodies.get(key);
+    if (!body) throw new Error("Object body not found");
+    return body;
   }
 }

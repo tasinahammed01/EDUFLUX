@@ -61,7 +61,8 @@ export function ConfirmDialog({
 
   if (!open) return null;
   async function performConfirmation() {
-    if (pending) return;
+    if (pendingRef.current) return;
+    pendingRef.current = true;
     setPending(true);
     try {
       await onConfirm();
@@ -69,6 +70,7 @@ export function ConfirmDialog({
     } catch {
       // The action owns safe user feedback; keep the dialog open for retry.
     } finally {
+      pendingRef.current = false;
       setPending(false);
     }
   }

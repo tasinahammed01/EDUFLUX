@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import mongoose from "mongoose";
+import mongoose, { type ClientSession } from "mongoose";
 import type {
   SubmissionDto,
   SubmissionFileDto,
@@ -17,6 +17,7 @@ import {
   AssignmentModel,
   type AssignmentRecord,
 } from "../assignments/assignment.model.js";
+import { RubricRevisionModel } from "../assignments/rubric-revision.model.js";
 import { ClassMembershipModel } from "../classes/class-membership.model.js";
 import { UserModel } from "../users/user.model.js";
 import { SubmissionModel, type SubmissionRecord } from "./submission.model.js";
@@ -28,6 +29,8 @@ import {
   SubmissionFileModel,
   type SubmissionFileRecord,
 } from "./submission-file.model.js";
+import { queueEvaluation } from "./submission-review.service.js";
+import { SubmissionEvaluationModel } from "./submission-evaluation.model.js";
 const allowed = [
   "application/pdf",
   "image/jpeg",
@@ -50,10 +53,10 @@ function fileDto(file: SubmissionFileRecord): SubmissionFileDto {
     createdAt: file.createdAt.toISOString(),
   };
 }
-async function policy(assignmentId: string, classId: string) {
-  const item = await AssignmentModel.findOne({ _id: assignmentId, classId })
-    .lean()
-    .exec();
+async function policy(assignmentId: string, classId: string, session?: ClientSession) {
+  const query = AssignmentModel.findOne({ _id: assignmentId, classId }).lean();
+  if (session) query.session(session);
+  const item = await query.exec();
   if (!item || item.status !== "PUBLISHED")
     throw new ApiError(404, "ASSIGNMENT_NOT_FOUND", "Assignment not found.");
   const now = new Date();
@@ -142,6 +145,9 @@ async function details(
       submittedAt: a.submittedAt.toISOString(),
       isLate: a.isLate,
       ...(a.rubricVersion ? { rubricVersion: a.rubricVersion } : {}),
+      ...(a.rubricRevisionId ? { rubricRevisionId: a.rubricRevisionId.toString() } : {}),
+      ...(a.rubricRevisionNumber ? { rubricRevisionNumber: a.rubricRevisionNumber } : {}),
+      ...(a.rubricHash ? { rubricHash: a.rubricHash } : {}),
     })),
     canSubmit: !reason,
     canResubmit:
@@ -164,24 +170,28 @@ export async function getStudentSubmission(
   userId: string,
 ) {
   const assignment = await policy(assignmentId, classId);
-  const submission = await aggregate(assignment, userId, classId);
-  return details(submission!, assignment);
+  const submission = await SubmissionModel.findOne({ assignmentId, studentUserId: userId }).exec();
+  if (submission) return details(submission, assignment);
+  const now = new Date(), isLate = Boolean(assignment.dueAt && now > assignment.dueAt);
+  const unavailableReason = assignment.dueAt && isLate && !assignment.allowLateSubmission ? "Submissions closed." : undefined;
+  return { id: "", assignmentId, classId, status: "DRAFT" as const, draftText: "", draftFiles: [], draftRevision: 0, latestAttemptNumber: 0, attempts: [], canSubmit: !unavailableReason, canResubmit: false, ...(unavailableReason ? { unavailableReason } : {}), isLate, limits: { maxFiles: env.SUBMISSION_MAX_FILES, maxFileBytes: env.SUBMISSION_MAX_FILE_BYTES, maxTotalBytes: env.SUBMISSION_MAX_TOTAL_BYTES, allowedMimeTypes: [...allowed] } };
 }
 async function validateFiles(
   submissionId: string,
   userId: string,
   assignmentId: string,
   fileIds: string[],
+  session?: ClientSession,
 ) {
-  const files = await SubmissionFileModel.find({
+  const query = SubmissionFileModel.find({
     _id: { $in: fileIds },
     submissionId,
     ownerUserId: userId,
     assignmentId,
     status: "READY",
-  })
-    .lean()
-    .exec();
+  }).lean();
+  if (session) query.session(session);
+  const files = await query.exec();
   if (files.length !== new Set(fileIds).size)
     throw new ApiError(
       400,
@@ -236,8 +246,9 @@ export async function submitWork(
   classId: string,
   userId: string,
 ) {
-  const assignment = await policy(assignmentId, classId);
+  let assignment: AssignmentRecord | undefined;
   const result = await mongoose.connection.transaction(async (session) => {
+    assignment = await policy(assignmentId, classId, session);
     const submission = await SubmissionModel.findOne({
       assignmentId,
       studentUserId: userId,
@@ -248,11 +259,14 @@ export async function submitWork(
         "DRAFT_REQUIRED",
         "Save a draft before submitting.",
       );
+    if (submission.draftFileIds.length === 0)
+      throw new ApiError(400, "SUBMISSION_FILE_REQUIRED", "Upload at least one image or PDF before submitting.");
     await validateFiles(
       submission._id.toString(),
       userId,
       assignmentId,
       submission.draftFileIds.map(String),
+      session,
     );
     const now = new Date(),
       isLate = Boolean(assignment.dueAt && now > assignment.dueAt);
@@ -270,6 +284,21 @@ export async function submitWork(
         409,
         "MAX_ATTEMPTS_REACHED",
         "Maximum attempts reached.",
+      );
+    const rubricRevision = assignment.currentRubricRevisionId
+      ? await RubricRevisionModel.findOne({
+          _id: assignment.currentRubricRevisionId,
+          assignmentId,
+        })
+          .session(session)
+          .lean()
+          .exec()
+      : null;
+    if (assignment.currentRubricRevisionId && !rubricRevision)
+      throw new ApiError(
+        409,
+        "RUBRIC_REVISION_UNAVAILABLE",
+        "The current rubric revision is unavailable. Try again.",
       );
     const next = submission.latestAttemptNumber + 1;
     const claimed = await SubmissionModel.findOneAndUpdate(
@@ -294,7 +323,7 @@ export async function submitWork(
         "SUBMIT_CONFLICT",
         "This attempt was already submitted.",
       );
-    await SubmissionAttemptModel.create(
+    const [attempt] = await SubmissionAttemptModel.create(
       [
         {
           submissionId: submission._id,
@@ -309,13 +338,43 @@ export async function submitWork(
           ...(assignment.rubric
             ? { rubricVersion: assignment.rubric.version }
             : {}),
+          ...(rubricRevision
+            ? {
+                rubricRevisionId: rubricRevision._id,
+                rubricRevisionNumber: rubricRevision.revisionNumber,
+                rubricHash: rubricRevision.rubricHash,
+              }
+            : {}),
         },
       ],
       { session },
     );
-    return claimed;
+    const [evaluation] = await SubmissionEvaluationModel.create([{
+      submissionId: submission._id,
+      attemptId: attempt!._id,
+      assignmentId,
+      classId,
+      studentUserId: userId,
+      ...(rubricRevision ? { rubricRevisionId: rubricRevision._id } : {}),
+      ...(rubricRevision ? { rubricRevisionNumber: rubricRevision.revisionNumber } : {}),
+      sourceFileIds: submission.draftFileIds,
+      status: "PENDING",
+      transcribedText: "",
+      effectiveText: "",
+      issues: [],
+      correctionStats: {},
+      legendSummary: [],
+      strengths: [],
+      feedbackSections: [],
+    }], { session });
+    return { claimed, attemptId: attempt!._id.toString(), attemptNumber: attempt!.attemptNumber, submittedAt: attempt!.submittedAt, evaluationId: evaluation!._id.toString() };
   });
-  return details(result, assignment);
+  queueEvaluation(result.attemptId);
+  return {
+    submission: await details(result.claimed, assignment!),
+    attempt: { id: result.attemptId, attemptNumber: result.attemptNumber, submittedAt: result.submittedAt.toISOString() },
+    evaluation: { id: result.evaluationId, status: "PENDING" as const },
+  };
 }
 export async function createUploadIntent(
   assignmentId: string,
@@ -548,10 +607,12 @@ export async function teacherSubmissions(
 }
 export async function teacherSubmissionDetail(
   submissionId: string,
+  assignmentId: string,
   classId: string,
 ) {
   const submission = await SubmissionModel.findOne({
     _id: submissionId,
+    assignmentId,
     classId,
   })
     .lean()

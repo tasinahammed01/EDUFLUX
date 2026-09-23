@@ -15,7 +15,9 @@ export interface AssignmentRecord {
   allowResubmission: boolean;
   maxAttempts?: number;
   showMarks: boolean;
-  rubric?: { version:number; title:string; description?:string; criteria:Array<{id:string;title:string;description?:string;maxPoints:number;performanceLevels:Array<{id:string;label:string;description?:string;points:number}>}> };
+  rubric?: { version:number; title:string; description?:string; levels:Array<{id:string;label:string;description?:string;percentage:number}>; criteria:Array<{id:string;title:string;description?:string;weight:number;descriptors:string[]}> };
+  currentRubricRevisionId?: Types.ObjectId;
+  currentRubricRevisionNumber?: number;
   resourceLinks: Array<{ label: string; url: string }>;
   publishedAt?: Date;
   archivedAt?: Date;
@@ -52,7 +54,9 @@ const schema = new Schema<AssignmentRecord>(
     allowResubmission: { type: Boolean, required: true, default: false },
     maxAttempts: { type: Number, min: 1, max: 10 },
     showMarks: { type: Boolean, required: true, default: true },
-    rubric: { type: new Schema({ version:{type:Number,required:true,default:1}, title:{type:String,required:true,maxlength:120}, description:{type:String,maxlength:1000}, criteria:{type:[new Schema({ id:{type:String,required:true}, title:{type:String,required:true,maxlength:120}, description:{type:String,maxlength:1000}, maxPoints:{type:Number,required:true,min:0}, performanceLevels:{type:[new Schema({id:{type:String,required:true},label:{type:String,required:true},description:{type:String,maxlength:500},points:{type:Number,required:true,min:0}},{_id:false})],default:[]}},{_id:false})],required:true} },{_id:false}), required:false },
+    rubric: { type: new Schema({ version:{type:Number,required:true,default:1}, title:{type:String,required:true,maxlength:120}, description:{type:String,maxlength:1000,default:""}, levels:{type:[new Schema({id:{type:String,required:true},label:{type:String,required:true},description:{type:String,maxlength:500,default:""},percentage:{type:Number,required:true,min:0,max:100}},{_id:false})],default:[]}, criteria:{type:[new Schema({ id:{type:String,required:true}, title:{type:String,required:true,maxlength:120}, description:{type:String,maxlength:1000,default:""}, weight:{type:Number,required:true,min:1,max:100}, descriptors:{type:[String],default:[]}},{_id:false})],required:true} },{_id:false}), required:false },
+    currentRubricRevisionId: { type: Schema.Types.ObjectId, ref: "RubricRevision" },
+    currentRubricRevisionNumber: { type: Number, min: 1 },
     resourceLinks: {
       type: [
         {

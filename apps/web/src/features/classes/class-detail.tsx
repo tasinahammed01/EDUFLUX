@@ -22,6 +22,7 @@ import type { CreateClassInput } from "@eduflux/validation";
 import { classesApi } from "@/lib/api/classes";
 import { notify } from "@/lib/notifications";
 import { ConfirmDialog } from "@/components/feedback/confirm-dialog";
+import { AssignmentCard } from "./assignment-card";
 type Tab = "overview" | "assignments" | "people" | "settings";
 type Confirmation = { kind: "leave" } | { kind: "rotate" } | { kind: "remove"; member: ClassMember };
 export function ClassDetail({
@@ -384,7 +385,6 @@ function Assignments({
           ? { availableFrom: new Date(available).toISOString() }
           : {}),
         ...(due ? { dueAt: new Date(due).toISOString() } : {}),
-        maxScore: Number(form.get("maxScore") || 100),
         allowLateSubmission: form.get("allowLateSubmission") === "on",
         allowResubmission: form.get("allowResubmission") === "on",
         showMarks: form.get("showMarks") === "on",
@@ -452,17 +452,6 @@ function Assignments({
               <input name="dueAt" type="datetime-local" />
             </label>
             <label>
-              Maximum score
-              <input
-                name="maxScore"
-                type="number"
-                min="0.01"
-                max="10000"
-                step="0.01"
-                defaultValue="100"
-              />
-            </label>
-            <label>
               Resource URL
               <input name="resourceUrl" type="url" placeholder="https://" />
             </label>
@@ -523,40 +512,12 @@ function Assignments({
           </div>
         ) : (
           items.map((item) => (
-            <article key={item.id}>
-              <div>
-                <small>{item.status}</small>
-                <h3>{item.title}</h3>
-                {item.description && <p>{item.description}</p>}
-              </div>
-              <span>
-                {item.dueAt
-                  ? `Due ${new Date(item.dueAt).toLocaleString()}`
-                  : "No due date"}{" "}
-                · {item.maxScore} points
-              </span>
-              <Link href={`/${mode}/classes/${id}/assignments/${item.id}`}>
-                Open assignment
-              </Link>
-              {mode === "teacher" && item.status === "DRAFT" && (
-                <button
-                  onClick={async () => {
-                    try {
-                      const next = await classesApi.publishAssignment(id, item.id);
-                      setItems((current) => current.map((value) => value.id === next.id ? next : value));
-                      notify.success("Assignment published", `assignment-published-${item.id}`);
-                    } catch (caught) {
-                      notify.error(caught, "Could not publish assignment.", `assignment-publish-error-${item.id}`);
-                    }
-                  }}
-                >
-                  Publish
-                </button>
-              )}
-              {mode === "teacher" && item.status !== "ARCHIVED" && (
-                <button onClick={() => setArchiveTarget(item)}>Archive</button>
-              )}
-            </article>
+            <AssignmentCard
+              key={item.id}
+              assignment={item}
+              classId={id}
+              mode={mode}
+            />
           ))
         )}
       </div>

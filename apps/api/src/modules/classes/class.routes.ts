@@ -13,6 +13,7 @@ import { sendData } from "../../utils/respond.js";
 import {
   archiveClass,
   createClass,
+  deleteClass,
   editClass,
   getClassForMember,
   joinByInvite,
@@ -21,6 +22,7 @@ import {
   listMyClasses,
   previewInvite,
   removeStudent,
+  restoreClass,
   rotateInvite,
 } from "./class.service.js";
 import {
@@ -148,6 +150,32 @@ classRouter.post(
   async (request, response, next) => {
     try {
       sendData(response, await archiveClass(request.classMembership!.classId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+classRouter.post(
+  "/:classId/restore",
+  requireCsrf,
+  requireClassMembership,
+  requireClassRole("OWNER"),
+  async (request, response, next) => {
+    try {
+      sendData(response, await restoreClass(request.classMembership!.classId));
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+classRouter.delete(
+  "/:classId",
+  requireCsrf,
+  requireClassMembership,
+  requireClassRole("OWNER"),
+  async (request, response, next) => {
+    try {
+      sendData(response, await deleteClass(request.classMembership!.classId));
     } catch (error) {
       next(error);
     }

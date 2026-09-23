@@ -340,6 +340,53 @@
   resize: vertical;
   min-height: 12rem;
 }
+
+.submission-dialog-backdrop {
+  position: fixed; inset: 0; z-index: 1200; display: grid; place-items: center;
+  padding: 1.25rem; background: color-mix(in srgb, var(--background) 72%, transparent); backdrop-filter: blur(10px);
+}
+.student-submission-dialog {
+  width: min(58rem, 100%); max-height: calc(100svh - 2.5rem); overflow: auto; display: grid; gap: 1rem;
+  padding: clamp(1rem, 3vw, 1.6rem); border: 1px solid var(--border); border-radius: 1.25rem;
+  color: var(--foreground); background: var(--surface-elevated); box-shadow: 0 30px 90px rgba(0,0,0,.4);
+}
+.submission-dialog-header { display: flex; justify-content: space-between; gap: 1rem; }
+.submission-dialog-header h2 { margin: .2rem 0; font-size: clamp(1.35rem, 3vw, 2rem); }
+.submission-dialog-header p:last-child { margin: .5rem 0 0; color: var(--muted); white-space: pre-wrap; }
+.submission-dialog-close { width: 2.5rem; height: 2.5rem; flex: 0 0 auto; display: grid; place-items: center; border: 0; border-radius: .7rem; color: var(--foreground); background: color-mix(in srgb, var(--surface) 80%, transparent); cursor: pointer; }
+.submission-dialog-close svg { width: 1.1rem; }
+.submission-context { display: grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap: .7rem; }
+.submission-context > span { display: grid; gap: .25rem; padding: .75rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }
+.submission-context small { color: var(--muted); }.submission-late strong { color: var(--gold); }
+.submission-rubric { padding: .75rem; border: 1px solid var(--border); border-radius: .75rem; }
+.submission-rubric summary { cursor: pointer; font-weight: 700; }.submission-rubric span { display: flex; justify-content: space-between; gap: 1rem; padding: .45rem 0; color: var(--muted); }
+.submission-method-heading { margin: 0 0 .55rem; font-size: .9rem; }
+.submission-methods { display: grid; grid-template-columns: repeat(2,1fr); gap: .65rem; }
+.submission-methods button { min-height: 4.25rem; display: flex; align-items: center; justify-content: flex-start; gap: .75rem; padding: .8rem 1rem; border: 1px solid var(--border); border-radius: .8rem; color: var(--muted); background: var(--surface); cursor: pointer; text-align: left; }
+.submission-methods button[aria-selected="true"] { color: var(--foreground); border-color: color-mix(in srgb, var(--cyan) 55%, var(--border)); background: color-mix(in srgb, var(--cyan) 10%, var(--surface)); }
+.submission-methods svg { width: 1.45rem; }.submission-methods button > span { display: grid; gap: .15rem; }.submission-methods small { color: var(--muted); font-weight: 500; }
+.submission-typed { display: grid; gap: .5rem; }.submission-typed label { font-weight: 750; }
+.submission-typed textarea { width: 100%; min-height: 15rem; resize: vertical; padding: 1rem; border: 1px solid var(--border); border-radius: .85rem; color: var(--foreground); background: var(--surface); line-height: 1.65; }
+.submission-typed > div { display: flex; justify-content: space-between; color: var(--muted); font-size: .75rem; }
+.submission-drop-zone { min-height: 9rem; display: grid; place-content: center; justify-items: center; gap: .35rem; padding: 1.25rem; border: 1.5px dashed color-mix(in srgb, var(--cyan) 45%, var(--border)); border-radius: 1rem; text-align: center; background: color-mix(in srgb, var(--cyan) 5%, var(--surface)); cursor: pointer; }
+.submission-drop-zone svg { width: 2rem; height: 2rem; color: var(--cyan); }.submission-drop-zone span,.submission-drop-zone small { color: var(--muted); }
+.submission-attachments { display: grid; gap: .55rem; }.submission-attachments h3 { margin: .2rem 0; }
+.submission-attachments > div { min-width: 0; display: grid; grid-template-columns: 2.5rem minmax(0,1fr) auto auto; align-items: center; gap: .65rem; padding: .65rem; border: 1px solid var(--border); border-radius: .75rem; background: var(--surface); }
+.submission-attachments img { width: 2.5rem; height: 2.5rem; object-fit: cover; border-radius: .4rem; }.submission-attachments > div > svg { width: 1.35rem; }
+.submission-attachments span { min-width: 0; display: grid; }.submission-attachments strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }.submission-attachments small { color: var(--muted); }.submission-attachments button { border: 0; color: var(--muted); background: transparent; cursor: pointer; }.submission-attachments button svg { width: 1rem; }.file-ready { color: #22a06b; }
+.submission-attempt-history { display: grid; gap: .55rem; }.submission-attempt-history h3 { margin: .2rem 0; }.submission-attempt-history a { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: .7rem .8rem; border: 1px solid var(--border); border-radius: .75rem; color: inherit; text-decoration: none; background: var(--surface); }.submission-attempt-history a:hover { border-color: var(--cyan); }.submission-attempt-history a > span:first-child { display: grid; }.submission-attempt-history small { color: var(--muted); }
+.submission-progress { display: grid; gap: .55rem; padding: .85rem; border: 1px solid var(--border); border-radius: .8rem; background: var(--surface); }.submission-progress > div:first-child { display: flex; justify-content: space-between; }
+.submission-progress-track { height: .55rem; overflow: hidden; border-radius: 999px; background: color-mix(in srgb, var(--muted) 20%, transparent); }.submission-progress-track span { display: block; height: 100%; background: linear-gradient(90deg,var(--cyan),var(--blue)); transition: width .12s linear; }
+.student-submission-dialog > footer { position: sticky; bottom: -1.6rem; display: flex; justify-content: flex-end; gap: .7rem; padding: 1rem 0 .1rem; background: var(--surface-elevated); }
+.submission-dialog-loading { min-height: 12rem; display: flex; place-content: center; align-items: center; justify-content: center; gap: .5rem; color: var(--muted); }
+.submission-dialog-loading svg { width: 1.2rem; }.submission-notice { color: var(--gold); }
+
+@media (max-width: 620px) {
+  .submission-dialog-backdrop { padding: 0; align-items: stretch; }
+  .student-submission-dialog { width: 100%; max-height: 100svh; min-height: 100svh; border: 0; border-radius: 0; padding: 1rem; }
+  .submission-context { grid-template-columns: 1fr 1fr; }.submission-methods { grid-template-columns: 1fr; }.submission-methods button { justify-content: flex-start; padding-inline: 1rem; }
+  .student-submission-dialog > footer { bottom: -1rem; }.student-submission-dialog > footer .button { flex: 1; }
+}
 .submission-list {
   display: grid;
   gap: 0.65rem;

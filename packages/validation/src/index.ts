@@ -117,7 +117,7 @@ export const rubricLevelSchema = z
     id: z.string().min(1).max(80),
     label: z.string().trim().min(1).max(80),
     description: z.string().trim().max(500).optional(),
-    points: z.number().min(0).max(10_000),
+    percentage: z.number().int().min(0).max(100),
   })
   .strict();
 export const rubricCriterionSchema = z
@@ -125,28 +125,51 @@ export const rubricCriterionSchema = z
     id: z.string().min(1).max(80),
     title: z.string().trim().min(2).max(120),
     description: z.string().trim().max(1000).optional(),
-    maxPoints: z.number().positive().max(10_000),
-    performanceLevels: z.array(rubricLevelSchema).max(6).default([]),
+    weight: z.number().int().positive().max(100),
+    descriptors: z.array(z.string().trim().max(1000)).default([]),
   })
   .strict()
   .superRefine((value, context) => {
-    value.performanceLevels.forEach((level, index) => {
-      if (level.points > value.maxPoints)
-        context.addIssue({
-          code: "custom",
-          message: "Level points cannot exceed criterion points.",
-          path: ["performanceLevels", index, "points"],
-        });
-    });
+    if (value.descriptors.length > 0 && value.descriptors.length !== 6) {
+      // Will validate against actual level count in rubric schema
+    }
   });
 export const rubricSchema = z
   .object({
     version: z.number().int().positive().default(1),
     title: z.string().trim().min(2).max(120),
-    description: z.string().trim().max(1000).optional(),
-    criteria: z.array(rubricCriterionSchema).min(1).max(20),
+    description: z.string().trim().max(1000),
+    levels: z.array(rubricLevelSchema).min(2).max(6).default([
+      { id: "excellent", label: "Excellent", description: "", percentage: 100 },
+      { id: "good", label: "Good", description: "", percentage: 80 },
+      { id: "satisfactory", label: "Satisfactory", description: "", percentage: 60 },
+      { id: "needs_improvement", label: "Needs Improvement", description: "", percentage: 40 },
+    ]),
+    criteria: z.array(rubricCriterionSchema).min(1).max(12),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    // Validate total weight equals 100
+    const totalWeight = value.criteria.reduce((sum, criterion) => sum + criterion.weight, 0);
+    if (totalWeight !== 100) {
+      context.addIssue({
+        code: "custom",
+        message: `Rubric criteria weights must total exactly 100. Current total: ${totalWeight}`,
+        path: ["criteria"],
+      });
+    }
+
+    // Validate each criterion has descriptor for each level
+    value.criteria.forEach((criterion, criterionIndex) => {
+      if (criterion.descriptors.length !== value.levels.length) {
+        context.addIssue({
+          code: "custom",
+          message: `Each criterion must have a descriptor for every level. Expected ${value.levels.length}, got ${criterion.descriptors.length}`,
+          path: ["criteria", criterionIndex, "descriptors"],
+        });
+      }
+    });
+  });
 const assignmentFieldsSchema = z
   .object({
     title: z.string().trim().min(2, "Assignment title is required.").max(150),
@@ -154,7 +177,6 @@ const assignmentFieldsSchema = z
     instructions: optionalText(10_000),
     availableFrom: timestampSchema.optional(),
     dueAt: timestampSchema.optional(),
-    maxScore: z.number().positive().max(10_000).default(100),
     allowLateSubmission: z.boolean().default(false),
     allowResubmission: z.boolean().default(false),
     maxAttempts: z.number().int().min(1).max(10).optional(),
@@ -222,6 +244,16 @@ export const rubricTemplateSchema = z
     description: z.string().trim().max(1000).optional(),
     rubric: rubricSchema,
   })
+  .strict();
+
+export const rubricGenerateSchema = z
+  .object({
+    prompt: z.string().trim().min(10).max(4000),
+  })
+  .strict();
+
+export const teacherCommentSchema = z
+  .object({ comment: z.string().trim().max(5000) })
   .strict();
 
 export type RegisterInput = z.infer<typeof registerSchema>;

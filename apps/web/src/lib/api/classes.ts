@@ -7,12 +7,16 @@ import type {
   TeacherSubmissionRow,
   SubmissionFileDto,
   UploadIntentDto,
+  RubricDto,
+  SubmissionReviewDto,
+  SubmitWorkResultDto,
 } from "@eduflux/shared-types";
 import type {
   AssignmentInput,
   CreateClassInput,
   UpdateAssignmentInput,
   UpdateClassInput,
+  RubricInput,
 } from "@eduflux/validation";
 import { api } from "./client";
 
@@ -39,6 +43,10 @@ export const classesApi = {
     api.patch<ClassSummary>(`/classes/${id}`, input),
   archive: (id: string) =>
     api.post<{ status: string }>(`/classes/${id}/archive`),
+  restore: (id: string) =>
+    api.post<{ status: string }>(`/classes/${id}/restore`),
+  delete: (id: string) =>
+    api.delete<{ deleted: boolean }>(`/classes/${id}`),
   leave: (id: string) => api.post<{ left: boolean }>(`/classes/${id}/leave`),
   removeMember: (id: string, membershipId: string) =>
     api.delete<{ removed: boolean }>(`/classes/${id}/members/${membershipId}`),
@@ -59,6 +67,8 @@ export const classesApi = {
     api.post<AssignmentDto>(`/classes/${classId}/assignments/${id}/publish`),
   archiveAssignment: (classId: string, id: string) =>
     api.post<AssignmentDto>(`/classes/${classId}/assignments/${id}/archive`),
+  deleteAssignment: (classId: string, id: string) =>
+    api.delete<{ id: string; deleted: boolean }>(`/classes/${classId}/assignments/${id}`),
   submission: (classId: string, assignmentId: string) =>
     api.get<SubmissionDto>(
       `/classes/${classId}/assignments/${assignmentId}/submission`,
@@ -75,7 +85,7 @@ export const classesApi = {
       { typedText, fileIds, draftRevision },
     ),
   submitAssignment: (classId: string, assignmentId: string) =>
-    api.post<SubmissionDto>(
+    api.post<SubmitWorkResultDto>(
       `/classes/${classId}/assignments/${assignmentId}/submission/submit`,
     ),
   submissionRows: (
@@ -99,7 +109,28 @@ export const classesApi = {
     }>(
       `/classes/${classId}/assignments/${assignmentId}/submissions?page=${page}&limit=20&filter=${filter}&search=${encodeURIComponent(search)}`,
     ),
+  teacherSubmission: (classId: string, assignmentId: string, submissionId: string) =>
+    api.get<SubmissionDto>(
+      `/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}`,
+    ),
+  teacherSubmissionReview: (classId: string, assignmentId: string, submissionId: string) =>
+    api.get<SubmissionReviewDto>(`/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/review`),
+  studentSubmissionReview: (classId: string, assignmentId: string) =>
+    api.get<SubmissionReviewDto>(`/classes/${classId}/assignments/${assignmentId}/submission/review`),
+  studentAttemptReview: (classId: string, assignmentId: string, submissionId: string, attemptId: string) =>
+    api.get<SubmissionReviewDto>(`/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${attemptId}/review`),
+  teacherAttemptReview: (classId: string, assignmentId: string, submissionId: string, attemptId: string) =>
+    api.get<SubmissionReviewDto>(`/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${attemptId}/teacher-review`),
+  saveTeacherComment: (classId: string, assignmentId: string, submissionId: string, comment: string) =>
+    api.post<SubmissionReviewDto>(`/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/comments`, { comment }),
   uploadIntent: (classId: string, assignmentId: string, filename: string, mimeType: string, sizeBytes: number) =>
     api.post<UploadIntentDto>(`/classes/${classId}/assignments/${assignmentId}/submission/files/intents`, { filename, mimeType, sizeBytes }),
   finalizeSubmissionFile: (fileId: string) => api.post<SubmissionFileDto>(`/submission-files/${fileId}/finalize`),
+  removeSubmissionFile: (fileId: string) => api.delete<{ removed: boolean; historical: boolean }>(`/submission-files/${fileId}`),
+  getRubric: (classId: string, assignmentId: string) =>
+    api.get<{ rubric?: RubricDto; locked: boolean; rubricRevisionNumber?: number }>(`/classes/${classId}/assignments/${assignmentId}/rubric`),
+  saveRubric: (classId: string, assignmentId: string, rubric: RubricInput) =>
+    api.put<AssignmentDto>(`/classes/${classId}/assignments/${assignmentId}/rubric`, rubric),
+  generateRubric: (classId: string, assignmentId: string, prompt: string) =>
+    api.post<RubricInput>(`/classes/${classId}/assignments/${assignmentId}/rubric/generate`, { prompt }),
 };

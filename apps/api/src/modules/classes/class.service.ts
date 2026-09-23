@@ -12,6 +12,7 @@ import { ApiError, isDuplicateKeyError } from "../../utils/api-error.js";
 import {
   countActiveMembers,
   countActiveMembersByClass,
+  deleteClassCascade,
   findActiveClassByCode,
   findActiveClassByToken,
   findClassById,
@@ -248,6 +249,21 @@ export async function archiveClass(classId: string) {
   });
   if (!record) throw new ApiError(404, "CLASS_NOT_FOUND", "Class not found.");
   return { status: record.status };
+}
+
+export async function restoreClass(classId: string) {
+  const record = await updateClass(classId, {
+    status: "ACTIVE",
+    allowJoinByCode: true,
+    allowJoinByLink: true,
+  });
+  if (!record) throw new ApiError(404, "CLASS_NOT_FOUND", "Class not found.");
+  return { status: record.status };
+}
+
+export async function deleteClass(classId: string) {
+  await deleteClassCascade(classId);
+  return { deleted: true };
 }
 export async function leaveClass(classId: string, userId: string) {
   if (!(await leaveMembership(classId, userId)))

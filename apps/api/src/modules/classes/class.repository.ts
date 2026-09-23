@@ -218,3 +218,23 @@ export function leaveMembership(classId: string, userId: string) {
     .lean()
     .exec();
 }
+
+export async function deleteClassCascade(classId: string) {
+  const session = await mongoose.startSession();
+  try {
+    await session.withTransaction(async () => {
+      // Delete all memberships for this class
+      await ClassMembershipModel.deleteMany({ classId }).session(session);
+      
+      // Delete the class itself
+      const result = await ClassModel.findByIdAndDelete(classId).session(session);
+      if (!result) {
+        throw new Error("Class not found");
+      }
+      
+      return result;
+    });
+  } finally {
+    await session.endSession();
+  }
+}

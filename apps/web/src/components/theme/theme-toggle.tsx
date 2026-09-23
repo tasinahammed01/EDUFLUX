@@ -45,7 +45,6 @@ export function ThemeToggle({ compact = false }: { compact?: boolean }) {
       >
         <Sun className="theme-icon theme-sun" aria-hidden="true" />
         <Moon className="theme-icon theme-moon" aria-hidden="true" />
-        {!compact && <span>Theme</span>}
       </button>
       {open && (
         <div className="theme-menu" id={menuId} role="menu" aria-label="Theme">

@@ -42,7 +42,7 @@ const classSchema = new Schema<ClassRecord>(
     allowJoinByLink: { type: Boolean, required: true, default: true },
     status: {
       type: String,
-      enum: ["ACTIVE", "ARCHIVED"],
+      enum: ["ACTIVE", "ARCHIVED", "DELETED"],
       required: true,
       default: "ACTIVE",
     },

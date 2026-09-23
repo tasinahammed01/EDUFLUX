@@ -17,6 +17,7 @@ export interface ObjectStorage {
     expiresIn: number;
   }): Promise<string>;
   deleteObject(key: string): Promise<void>;
+  getObject(key: string): Promise<Uint8Array>;
 }
 let override: ObjectStorage | undefined;
 export function setObjectStorageForTests(storage: ObjectStorage | undefined) {

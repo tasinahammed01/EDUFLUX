@@ -8,6 +8,8 @@ import { SubmissionModel } from "../modules/submissions/submission.model.js";
 import { SubmissionAttemptModel } from "../modules/submissions/submission-attempt.model.js";
 import { SubmissionFileModel } from "../modules/submissions/submission-file.model.js";
 import { RubricTemplateModel } from "../modules/rubrics/rubric-template.model.js";
+import { RubricRevisionModel } from "../modules/assignments/rubric-revision.model.js";
+import { SubmissionEvaluationModel } from "../modules/submissions/submission-evaluation.model.js";
 
 const logger = pino();
 try {
@@ -21,6 +23,8 @@ try {
     SubmissionAttemptModel,
     SubmissionFileModel,
     RubricTemplateModel,
+    RubricRevisionModel,
+    SubmissionEvaluationModel,
   ])
     await model.createIndexes();
   logger.info("EduFlux indexes created without dropping existing indexes");

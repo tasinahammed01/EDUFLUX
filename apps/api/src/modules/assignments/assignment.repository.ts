@@ -1,4 +1,6 @@
 import { AssignmentModel, type AssignmentRecord } from "./assignment.model.js";
+import mongoose from "mongoose";
+import { RubricRevisionModel } from "./rubric-revision.model.js";
 export function insertAssignment(input: Record<string, unknown>) {
   return new AssignmentModel(input).save();
 }
@@ -30,4 +32,10 @@ export function updateAssignment(id: string, input: Record<string, unknown>) {
   )
     .lean()
     .exec() as Promise<AssignmentRecord | null>;
+}
+export async function removeAssignment(id: string) {
+  return mongoose.connection.transaction(async (session) => {
+    await RubricRevisionModel.deleteMany({ assignmentId: id }).session(session);
+    return AssignmentModel.findByIdAndDelete(id).session(session).lean().exec();
+  });
 }

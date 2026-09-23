@@ -92,6 +92,11 @@ export function r2ObjectStorage(): ObjectStorage {
     async deleteObject(key) {
       await client.send(new DeleteObjectCommand({ Bucket: bucket, Key: key }));
     },
+    async getObject(key) {
+      const result = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }));
+      if (!result.Body) throw new Error("Stored object had no body");
+      return result.Body.transformToByteArray();
+    },
   };
   return instance;
 }

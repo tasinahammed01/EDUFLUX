@@ -3,10 +3,13 @@ import mongoose from "mongoose";
 import {
   assignmentInputSchema,
   memberQuerySchema,
+  rubricGenerateSchema,
+  rubricSchema,
   submissionDraftSchema,
   submissionQuerySchema,
   updateAssignmentSchema,
   uploadIntentSchema,
+  teacherCommentSchema,
 } from "@eduflux/validation";
 import { requireAuth } from "../auth/auth.middleware.js";
 import { requireCsrf } from "../auth/csrf.middleware.js";
@@ -20,9 +23,11 @@ import { ApiError } from "../../utils/api-error.js";
 import {
   archiveAssignment,
   createAssignment,
+  deleteAssignment,
   editAssignment,
   getAssignment,
   getAssignments,
+  mapAssignmentDto,
   publishAssignment,
 } from "./assignment.service.js";
 import {
@@ -33,6 +38,10 @@ import {
   teacherSubmissionDetail,
   teacherSubmissions,
 } from "../submissions/submission.service.js";
+import { saveTeacherComment, studentAttemptReview, studentReview, teacherAttemptReview, teacherReview } from "../submissions/submission-review.service.js";
+import { generateRubricWithAI } from "./rubric-ai.service.js";
+import { saveRubric, getRubricWithLockStatus } from "./rubric.service.js";
+import { rubricAiRateLimit } from "../auth/rate-limits.js";
 export const assignmentRouter = Router({ mergeParams: true });
 assignmentRouter.use(requireAuth, requireClassMembership);
 assignmentRouter.get("/", async (req, res, next) => {
@@ -47,6 +56,7 @@ assignmentRouter.get("/", async (req, res, next) => {
         req.classMembership!.role === "STUDENT",
         q.data.page,
         q.data.limit,
+        req.principal!.userId,
       ),
     );
   } catch (e) {
@@ -91,6 +101,22 @@ assignmentRouter.get(
     } catch (error) {
       next(error);
     }
+  },
+);
+assignmentRouter.get(
+  "/:assignmentId/submission/review",
+  requireClassRole("STUDENT"),
+  async (req, res, next) => {
+    try { sendData(res, await studentReview(String(req.params.assignmentId), req.classMembership!.classId, req.principal!.userId)); }
+    catch (error) { next(error); }
+  },
+);
+assignmentRouter.get(
+  "/:assignmentId/submissions/:submissionId/attempts/:attemptId/review",
+  requireClassRole("STUDENT"),
+  async (req, res, next) => {
+    try { sendData(res, await studentAttemptReview(String(req.params.submissionId), String(req.params.attemptId), String(req.params.assignmentId), req.classMembership!.classId, req.principal!.userId)); }
+    catch (error) { next(error); }
   },
 );
 assignmentRouter.patch(
@@ -194,12 +220,39 @@ assignmentRouter.get(
         res,
         await teacherSubmissionDetail(
           String(req.params.submissionId),
+          String(req.params.assignmentId),
           req.classMembership!.classId,
         ),
       );
     } catch (error) {
       next(error);
     }
+  },
+);
+assignmentRouter.get(
+  "/:assignmentId/submissions/:submissionId/review",
+  requireClassRole("OWNER", "TEACHER"),
+  async (req, res, next) => {
+    try { sendData(res, await teacherReview(String(req.params.submissionId), String(req.params.assignmentId), req.classMembership!.classId)); }
+    catch (error) { next(error); }
+  },
+);
+assignmentRouter.get(
+  "/:assignmentId/submissions/:submissionId/attempts/:attemptId/teacher-review",
+  requireClassRole("OWNER", "TEACHER"),
+  async (req, res, next) => {
+    try { sendData(res, await teacherAttemptReview(String(req.params.submissionId), String(req.params.attemptId), String(req.params.assignmentId), req.classMembership!.classId)); }
+    catch (error) { next(error); }
+  },
+);
+assignmentRouter.post(
+  "/:assignmentId/submissions/:submissionId/comments",
+  requireCsrf,
+  requireClassRole("OWNER", "TEACHER"),
+  validateBody(teacherCommentSchema),
+  async (req, res, next) => {
+    try { sendData(res, await saveTeacherComment(String(req.params.submissionId), String(req.params.assignmentId), req.classMembership!.classId, req.body.comment)); }
+    catch (error) { next(error); }
   },
 );
 assignmentRouter.get("/:assignmentId", async (req, res, next) => {
@@ -235,6 +288,7 @@ assignmentRouter.patch(
         await editAssignment(
           String(req.params.assignmentId),
           req.classMembership!.classId,
+          req.principal!.userId,
           req.body,
         ),
       );
@@ -254,6 +308,7 @@ assignmentRouter.post(
         await publishAssignment(
           String(req.params.assignmentId),
           req.classMembership!.classId,
+          req.principal!.userId,
         ),
       );
     } catch (e) {
@@ -274,6 +329,80 @@ assignmentRouter.post(
           req.classMembership!.classId,
         ),
       );
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+assignmentRouter.delete(
+  "/:assignmentId",
+  requireCsrf,
+  requireClassRole("OWNER", "TEACHER"),
+  async (req, res, next) => {
+    try {
+      sendData(
+        res,
+        await deleteAssignment(
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+        ),
+      );
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+// Rubric endpoints
+assignmentRouter.get(
+  "/:assignmentId/rubric",
+  async (req, res, next) => {
+    try {
+      const result = await getRubricWithLockStatus(
+        String(req.params.assignmentId),
+        req.classMembership!.classId,
+      );
+      sendData(res, result);
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assignmentRouter.put(
+  "/:assignmentId/rubric",
+  requireCsrf,
+  requireClassRole("OWNER", "TEACHER"),
+  validateBody(rubricSchema),
+  async (req, res, next) => {
+    try {
+      const updated = await saveRubric(
+        String(req.params.assignmentId),
+        req.classMembership!.classId,
+        req.principal!.userId,
+        req.body,
+      );
+      sendData(res, mapAssignmentDto(updated, { rubricLocked: false }));
+    } catch (e) {
+      next(e);
+    }
+  },
+);
+
+assignmentRouter.post(
+  "/:assignmentId/rubric/generate",
+  requireCsrf,
+  requireClassRole("OWNER", "TEACHER"),
+  rubricAiRateLimit,
+  validateBody(rubricGenerateSchema),
+  async (req, res, next) => {
+    try {
+      const rubricDraft = await generateRubricWithAI(
+        String(req.params.assignmentId),
+        req.classMembership!.classId,
+        req.body.prompt,
+      );
+      sendData(res, rubricDraft);
     } catch (e) {
       next(e);
     }
