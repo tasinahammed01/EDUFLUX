@@ -41,9 +41,15 @@ import { env } from "./config/env.js";
 import { errorHandler } from "./middleware/error-handler.js";
 import { authRouter } from "./modules/auth/auth.routes.js";
 import { classRouter } from "./modules/classes/class.routes.js";
-import { isDatabaseReady } from "./config/database.js";
+import { isDatabaseReady, ensureDatabaseConnection } from "./config/database.js";
 import { isFirebaseAdminReady } from "./config/firebase-admin.js";
 import { submissionFileRouter } from "./modules/submissions/submission-file.routes.js";
+
+if (env.NODE_ENV !== "test") {
+  ensureDatabaseConnection().catch((error) => {
+    console.error("Failed to initialize database connection:", error.message);
+  });
+}
 
 export const app = express();
 
@@ -96,11 +102,30 @@ app.get("/health", (_request, response) => {
 app.get("/health/live", (_request, response) =>
   response.json({ status: "ok" }),
 );
-app.get("/health/ready", (_request, response) =>
-  isDatabaseReady() && isFirebaseAdminReady()
-    ? response.json({ status: "ok" })
-    : response.status(503).json({ status: "unavailable" }),
-);
+app.get("/health/ready", (request, response) => {
+  const dbReady = isDatabaseReady();
+  const firebaseReady = isFirebaseAdminReady();
+
+  if (!dbReady || !firebaseReady) {
+    const unavailable = [];
+    if (!dbReady) unavailable.push("database");
+    if (!firebaseReady) unavailable.push("firebase");
+
+    const logger = (request as any).log;
+    if (logger) {
+      logger.warn({
+        databaseReady: dbReady,
+        firebaseReady: firebaseReady,
+        unavailable
+      }, "Health check failed - dependencies not ready");
+    }
+
+    response.status(503).json({ status: "unavailable" });
+    return;
+  }
+
+  response.json({ status: "ok" });
+});
 app.use("/api/v1/auth", authRouter);
 app.use("/api/v1/classes", classRouter);
 app.use("/api/v1/submission-files", submissionFileRouter);
