@@ -2,7 +2,7 @@ import vision from "@google-cloud/vision";
 import { createCanvas } from "@napi-rs/canvas";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { env } from "../../config/env.js";
-import { readLocalGoogleCredentialConfig, normalizePrivateKey } from "../../config/google-credentials.js";
+import { loadGoogleCredentials, readLocalGoogleCredentialConfig } from "../../config/google-credentials.js";
 import { getObjectStorage } from "../../storage/object-storage.js";
 import type { SubmissionFileRecord } from "./submission-file.model.js";
 
@@ -59,15 +59,12 @@ export class GoogleVisionOcrProvider implements OcrProvider {
       if (!this.client) {
         const credentialConfig = readLocalGoogleCredentialConfig();
         if (credentialConfig.source === "GOOGLE_CLOUD_CREDENTIALS_JSON" && credentialConfig.credentials) {
-          const { client_email, private_key, project_id } = credentialConfig.credentials;
-          if (!client_email || !private_key || !project_id) {
-            throw new OcrProviderError("Google Vision JSON credentials missing required fields", "OCR_PROVIDER_CONFIG_ERROR");
-          }
+          const credentials = loadGoogleCredentials(credentialConfig);
           this.client = new vision.ImageAnnotatorClient({
             credentials: {
-              client_email,
-              private_key: normalizePrivateKey(private_key),
-              project_id,
+              client_email: credentials.clientEmail,
+              private_key: credentials.privateKey,
+              project_id: credentials.projectId,
             },
           });
         } else if (credentialConfig.resolvedPath) {

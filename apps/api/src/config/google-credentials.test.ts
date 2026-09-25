@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { resolveCredentialPath, resolveGoogleCredentialConfig, validateCredentialFile, parseGoogleCredentialsJson, normalizePrivateKey } from "./google-credentials.js";
+import { resolveCredentialPath, resolveGoogleCredentialConfig, validateCredentialFile, parseGoogleCredentialsJson, normalizePrivateKey, loadGoogleCredentials } from "./google-credentials.js";
 
 let temporaryDirectory: string | undefined;
 afterEach(() => { if (temporaryDirectory) rmSync(temporaryDirectory, { recursive: true, force: true }); temporaryDirectory = undefined; });
@@ -27,6 +27,11 @@ describe("Google credential path resolution", () => {
     expect(() => validateCredentialFile(fixture)).not.toThrow();
     expect(() => validateCredentialFile(path.join(temporaryDirectory, "missing.json"))).toThrow(/credential file not found/i);
   });
+  it("error messages do not contain secret material", () => {
+    expect(() => validateCredentialFile("nonexistent-path")).toThrow(/credential file not found/i);
+    expect(() => validateCredentialFile("nonexistent-path")).not.toThrow(/private_key/i);
+    expect(() => validateCredentialFile("nonexistent-path")).not.toThrow(/client_email/i);
+  });
 });
 
 describe("Google JSON credentials", () => {
@@ -47,7 +52,7 @@ describe("Google JSON credentials", () => {
     expect(normalized).toBe("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----");
   });
   it("fails safely on malformed JSON", () => {
-    expect(() => parseGoogleCredentialsJson("invalid json")).toThrow("Invalid Google Cloud credentials JSON");
+    expect(() => parseGoogleCredentialsJson("invalid json")).toThrow("GOOGLE_CLOUD_CREDENTIALS_JSON is not valid JSON");
   });
   it("returns empty config when no credentials provided", () => {
     const config = resolveGoogleCredentialConfig({});
@@ -58,5 +63,70 @@ describe("Google JSON credentials", () => {
     const config = resolveGoogleCredentialConfig({ credentialsJson: jsonCreds });
     expect(config.credentials?.private_key).toBe("secret-key");
     expect(config.credentials?.client_email).toBe("test@example.com");
+  });
+});
+
+describe("loadGoogleCredentials", () => {
+  it("loads JSON credentials from env", () => {
+    const jsonCreds = '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}';
+    const config = resolveGoogleCredentialConfig({ credentialsJson: jsonCreds });
+    const credentials = loadGoogleCredentials(config);
+    expect(credentials).toMatchObject({
+      projectId: "test-project",
+      clientEmail: "test@example.com",
+      source: "json_env",
+    });
+    expect(credentials.privateKey).toContain("-----BEGIN PRIVATE KEY-----\ntest\n-----END PRIVATE KEY-----");
+  });
+
+  it("loads credentials from file path", () => {
+    temporaryDirectory = mkdtempSync(path.join(tmpdir(), "eduflux-vision-"));
+    const fixture = path.join(temporaryDirectory, "credentials.json");
+    const jsonCreds = '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}';
+    writeFileSync(fixture, jsonCreds);
+    const config = resolveGoogleCredentialConfig({ applicationCredentials: fixture, packageRoot: temporaryDirectory });
+    const credentials = loadGoogleCredentials(config);
+    expect(credentials).toMatchObject({
+      projectId: "test-project",
+      clientEmail: "test@example.com",
+      source: "file_path",
+    });
+  });
+
+  it("fails when JSON credentials missing required fields", () => {
+    const jsonCreds = '{"client_email":"test@example.com","project_id":"test-project"}';
+    const config = resolveGoogleCredentialConfig({ credentialsJson: jsonCreds });
+    expect(() => loadGoogleCredentials(config)).toThrow("GOOGLE_CLOUD_CREDENTIALS_JSON is missing required fields");
+  });
+
+  it("fails when file credentials missing required fields", () => {
+    temporaryDirectory = mkdtempSync(path.join(tmpdir(), "eduflux-vision-"));
+    const fixture = path.join(temporaryDirectory, "credentials.json");
+    const jsonCreds = '{"client_email":"test@example.com","project_id":"test-project"}';
+    writeFileSync(fixture, jsonCreds);
+    const config = resolveGoogleCredentialConfig({ applicationCredentials: fixture, packageRoot: temporaryDirectory });
+    expect(() => loadGoogleCredentials(config)).toThrow("Google credentials file is missing required fields");
+  });
+
+  it("fails when no valid credential configuration", () => {
+    const config = resolveGoogleCredentialConfig({});
+    expect(() => loadGoogleCredentials(config)).toThrow("No valid Google credentials configuration found");
+  });
+
+  it("error messages do not contain secret material", () => {
+    const jsonCreds = '{"client_email":"test@example.com","private_key":"secret-key","project_id":"test-project"}';
+    const config = resolveGoogleCredentialConfig({ credentialsJson: jsonCreds });
+    try {
+      loadGoogleCredentials(config);
+    } catch (error) {
+      expect(error instanceof Error && error.message).not.toContain("secret-key");
+    }
+  });
+
+  it("JSON credentials do NOT call file-path validation", () => {
+    const jsonCreds = '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}';
+    const config = resolveGoogleCredentialConfig({ credentialsJson: jsonCreds });
+    const credentials = loadGoogleCredentials(config);
+    expect(credentials.source).toBe("json_env");
   });
 });

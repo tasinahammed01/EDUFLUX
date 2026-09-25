@@ -11,7 +11,7 @@ function setEnvironment(overrides: Record<string, string | undefined>) {
     MONGODB_URI: "mongodb://127.0.0.1:27017/eduflux-test",
     CSRF_SECRET: "test-csrf-secret-at-least-32-characters"
   };
-  for (const key of ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_CREDENTIALS_JSON"]) {
+  for (const key of ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_CREDENTIALS_JSON", "GOOGLE_CLOUD_KEY_FILE"]) {
     delete process.env[key];
   }
   for (const [key, value] of Object.entries(overrides)) {
@@ -156,6 +156,98 @@ describe("Provider-specific credential validation", () => {
       OCR_PROVIDER: "google-vision",
       GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"key","project_id":"test"}',
       GOOGLE_APPLICATION_CREDENTIALS: "nonexistent.json",
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("JSON credentials do not trigger file-path validation", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}',
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("JSON credentials take precedence when both are supplied", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}',
+      GOOGLE_APPLICATION_CREDENTIALS: fileURLToPath(new URL("../../package.json", import.meta.url)),
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("malformed JSON fails safely", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: "invalid-json{",
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).rejects.toThrow("GOOGLE_CLOUD_CREDENTIALS_JSON is not valid JSON");
+  });
+
+  it("missing required fields in JSON fails safely", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","project_id":"test-project"}',
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).rejects.toThrow("GOOGLE_CLOUD_CREDENTIALS_JSON is missing required fields: client_email, private_key, or project_id");
+  });
+
+  it("escaped newlines in private key are normalized", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"-----BEGIN PRIVATE KEY-----\\ntest\\n-----END PRIVATE KEY-----","project_id":"test-project"}',
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("non-google OCR mode does not require Google credentials", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "openai",
+      OCR_API_KEY: "sk-test-key-minimum-20-chars",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: undefined,
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "openai" });
+  });
+
+  it("GOOGLE_APPLICATION_CREDENTIALS file path still works locally", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: undefined,
+      GOOGLE_APPLICATION_CREDENTIALS: fileURLToPath(new URL("../../package.json", import.meta.url)),
       FIREBASE_PROJECT_ID: "test-project",
       FIREBASE_CLIENT_EMAIL: "test@example.com",
       FIREBASE_PRIVATE_KEY: "private-key"

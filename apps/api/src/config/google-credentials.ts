@@ -16,6 +16,13 @@ export type GoogleCredentialConfig = {
   };
 };
 
+export type NormalizedGoogleCredentials = {
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+  source: "json_env" | "file_path";
+};
+
 export function resolveCredentialPath(value: string, packageRoot = API_PACKAGE_ROOT) {
   return path.isAbsolute(value) ? path.normalize(value) : path.resolve(packageRoot, value);
 }
@@ -29,7 +36,7 @@ export function parseGoogleCredentialsJson(jsonString: string): { client_email?:
       project_id: parsed.project_id,
     };
   } catch {
-    throw new Error("Invalid Google Cloud credentials JSON");
+    throw new Error("GOOGLE_CLOUD_CREDENTIALS_JSON is not valid JSON");
   }
 }
 
@@ -71,13 +78,45 @@ export function readLocalGoogleCredentialConfig(nodeEnv = process.env.NODE_ENV) 
 }
 
 export function validateCredentialFile(resolvedPath: string) {
-  if (!existsSync(resolvedPath)) throw new Error(`Google Vision credential file not found: ${resolvedPath}`);
-  if (!statSync(resolvedPath).isFile()) throw new Error(`Google Vision credential path is not a file: ${resolvedPath}`);
+  if (!existsSync(resolvedPath)) throw new Error("Google Vision credential file not found");
+  if (!statSync(resolvedPath).isFile()) throw new Error("Google Vision credential path is not a file");
   try { accessSync(resolvedPath, constants.R_OK); }
-  catch { throw new Error(`Google Vision credential file is not readable: ${resolvedPath}`); }
+  catch { throw new Error("Google Vision credential file is not readable"); }
 }
 
 export function normalizePrivateKey(privateKey: string): string {
   // Handle escaped newlines in environment variable storage
   return privateKey.replace(/\\n/g, "\n");
+}
+
+export function loadGoogleCredentials(config: GoogleCredentialConfig): NormalizedGoogleCredentials {
+  if (config.source === "GOOGLE_CLOUD_CREDENTIALS_JSON" && config.credentials) {
+    const { client_email, private_key, project_id } = config.credentials;
+    if (!client_email || !private_key || !project_id) {
+      throw new Error("GOOGLE_CLOUD_CREDENTIALS_JSON is missing required fields: client_email, private_key, or project_id");
+    }
+    return {
+      projectId: project_id,
+      clientEmail: client_email,
+      privateKey: normalizePrivateKey(private_key),
+      source: "json_env",
+    };
+  }
+
+  if (config.resolvedPath) {
+    const fileContent = readFileSync(config.resolvedPath, "utf-8");
+    const parsed = parseGoogleCredentialsJson(fileContent);
+    const { client_email, private_key, project_id } = parsed;
+    if (!client_email || !private_key || !project_id) {
+      throw new Error("Google credentials file is missing required fields: client_email, private_key, or project_id");
+    }
+    return {
+      projectId: project_id,
+      clientEmail: client_email,
+      privateKey: normalizePrivateKey(private_key),
+      source: "file_path",
+    };
+  }
+
+  throw new Error("No valid Google credentials configuration found");
 }

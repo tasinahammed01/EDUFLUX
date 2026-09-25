@@ -106,6 +106,16 @@ const schema = z
       if (!hasJsonCredentials && !hasFileCredentials) {
         context.addIssue({ code: "custom", message: "GOOGLE_CLOUD_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS is required when OCR_PROVIDER=google-vision.", path: ["GOOGLE_CLOUD_CREDENTIALS_JSON"] });
       }
+      if (hasJsonCredentials) {
+        try {
+          const parsed = JSON.parse(value.GOOGLE_CLOUD_CREDENTIALS_JSON!);
+          if (!parsed.client_email || !parsed.private_key || !parsed.project_id) {
+            context.addIssue({ code: "custom", message: "GOOGLE_CLOUD_CREDENTIALS_JSON is missing required fields: client_email, private_key, or project_id", path: ["GOOGLE_CLOUD_CREDENTIALS_JSON"] });
+          }
+        } catch {
+          context.addIssue({ code: "custom", message: "GOOGLE_CLOUD_CREDENTIALS_JSON is not valid JSON", path: ["GOOGLE_CLOUD_CREDENTIALS_JSON"] });
+        }
+      }
     }
     const explicitCredentialCount = [
       value.FIREBASE_PROJECT_ID,
@@ -136,7 +146,8 @@ const schema = z
     } else if (
       explicitCredentialCount === 0 &&
       !value.GOOGLE_CLOUD_CREDENTIALS_JSON &&
-      !existsSync(value.GOOGLE_APPLICATION_CREDENTIALS!)
+      value.GOOGLE_APPLICATION_CREDENTIALS &&
+      !existsSync(value.GOOGLE_APPLICATION_CREDENTIALS)
     ) {
       context.addIssue({
         code: "custom",
@@ -171,5 +182,5 @@ const schema = z
 
 const environment = { ...process.env, ...(googleCredentials.resolvedPath ? { GOOGLE_APPLICATION_CREDENTIALS: googleCredentials.resolvedPath } : {}) };
 export const env = schema.parse(environment);
-if (env.NODE_ENV !== "test" && env.OCR_PROVIDER === "google-vision" && googleCredentials.source !== "GOOGLE_CLOUD_CREDENTIALS_JSON") validateCredentialFile(env.GOOGLE_APPLICATION_CREDENTIALS!);
+if (env.NODE_ENV !== "test" && env.OCR_PROVIDER === "google-vision" && googleCredentials.source !== "GOOGLE_CLOUD_CREDENTIALS_JSON" && env.GOOGLE_APPLICATION_CREDENTIALS) validateCredentialFile(env.GOOGLE_APPLICATION_CREDENTIALS);
 export const googleCredentialSource = googleCredentials.source;

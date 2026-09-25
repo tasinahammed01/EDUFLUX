@@ -13,3 +13,6 @@ allowBuilds:
 
 minimumReleaseAgeExclude:
   - zod@4.6.4
+
+overrides:
+  "jwks-rsa>jose": "4.15.9"
