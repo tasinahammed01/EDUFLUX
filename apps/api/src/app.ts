@@ -2,8 +2,39 @@ import cors from "cors";
 import cookieParser from "cookie-parser";
 import express from "express";
 import * as helmetModule from "helmet";
-const helmet = helmetModule.default;
 import { pinoHttp } from "pino-http";
+import type { RequestHandler } from "express";
+
+type HelmetFactory = () => RequestHandler;
+
+function resolveHelmetFactory(value: unknown): HelmetFactory {
+  let candidate: unknown = value;
+
+  for (
+    let depth = 0;
+    depth < 2 && typeof candidate !== "function";
+    depth += 1
+  ) {
+    if (
+      candidate !== null &&
+      typeof candidate === "object" &&
+      "default" in candidate
+    ) {
+      candidate = (candidate as { default: unknown }).default;
+      continue;
+    }
+
+    break;
+  }
+
+  if (typeof candidate !== "function") {
+    throw new TypeError("Helmet module did not expose a callable factory.");
+  }
+
+  return candidate as HelmetFactory;
+}
+
+const helmet = resolveHelmetFactory(helmetModule);
 import { randomUUID } from "node:crypto";
 import type { HealthResponse } from "@eduflux/shared-types";
 import { env } from "./config/env.js";
@@ -81,3 +112,5 @@ app.use((_request, response) =>
   }),
 );
 app.use(errorHandler);
+
+export default app;

@@ -9,6 +9,7 @@ allowBuilds:
   mongodb-memory-server: true
   '@firebase/util': true
   protobufjs: true
+  esbuild@0.27.0: true
 
 minimumReleaseAgeExclude:
   - zod@4.6.4
