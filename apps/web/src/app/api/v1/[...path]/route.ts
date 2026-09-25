@@ -5,7 +5,7 @@ function getApiInternalUrl(): string {
   return url && url.trim() ? url : "http://localhost:5000";
 }
 
-// Headers that should not be forwarded
+// Headers that should not be forwarded from request
 const HOP_BY_HOP_HEADERS = new Set([
   "host",
   "content-length",
@@ -19,10 +19,23 @@ const HOP_BY_HOP_HEADERS = new Set([
   "proxy-authenticate",
 ]);
 
-// Headers that are safe to forward
+// Headers that should not be forwarded from response (compression metadata)
+const RESPONSE_HEADERS_TO_REMOVE = new Set([
+  "content-encoding",
+  "content-length",
+  "transfer-encoding",
+  "connection",
+  "keep-alive",
+  "te",
+  "trailer",
+  "upgrade",
+  "proxy-authenticate",
+  "proxy-authorization",
+]);
+
+// Headers that are safe to forward from request
 const SAFE_FORWARD_HEADERS = [
   "content-type",
-  "accept",
   "authorization",
   "x-csrf-token",
   "cookie",
@@ -44,10 +57,14 @@ function filterRequestHeaders(headers: Headers): Headers {
   for (const [key, value] of headers.entries()) {
     const lowerKey = key.toLowerCase();
     if (HOP_BY_HOP_HEADERS.has(lowerKey)) continue;
+    // Do NOT forward accept-encoding to avoid upstream compression
+    if (lowerKey === "accept-encoding") continue;
     if (SAFE_FORWARD_HEADERS.includes(lowerKey)) {
       filtered.set(key, value);
     }
   }
+  // Request uncompressed response from upstream
+  filtered.set("accept-encoding", "identity");
   return filtered;
 }
 
@@ -58,11 +75,16 @@ function filterResponseHeaders(headers: Headers): Headers {
     // Preserve Set-Cookie headers
     if (lowerKey === "set-cookie") {
       filtered.append(key, value);
-    } else if (!HOP_BY_HOP_HEADERS.has(lowerKey)) {
+    } else if (!RESPONSE_HEADERS_TO_REMOVE.has(lowerKey)) {
       filtered.set(key, value);
     }
   }
   return filtered;
+}
+
+function shouldHaveBody(status: number): boolean {
+  // 204 No Content and 205 Reset Content must not have a body
+  return status !== 204 && status !== 205;
 }
 
 export async function GET(
@@ -81,7 +103,8 @@ export async function GET(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const body = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(body, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -106,7 +129,8 @@ export async function POST(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const responseBody = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -131,7 +155,8 @@ export async function PUT(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const responseBody = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -156,7 +181,8 @@ export async function PATCH(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const responseBody = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -178,7 +204,8 @@ export async function DELETE(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const responseBody = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -200,7 +227,8 @@ export async function OPTIONS(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
-  return NextResponse.json(await response.json(), {
+  const responseBody = shouldHaveBody(response.status) ? await response.text() : null;
+  return new NextResponse(responseBody, {
     status: response.status,
     headers: filteredHeaders,
   });
@@ -222,6 +250,7 @@ export async function HEAD(
   });
 
   const filteredHeaders = filterResponseHeaders(response.headers);
+  // HEAD responses must not have a body
   return new NextResponse(null, {
     status: response.status,
     headers: filteredHeaders,

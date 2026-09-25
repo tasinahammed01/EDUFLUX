@@ -2,6 +2,9 @@ import { describe, expect, it, beforeEach, afterEach, vi } from "vitest";
 import { GET, POST, PUT, PATCH, DELETE, OPTIONS, HEAD } from "./route";
 import { NextRequest } from "next/server";
 
+// Type for the params object used in tests
+type TestParams = { params: Promise<{ path: string[] }> };
+
 // Mock fetch to control upstream responses
 const mockFetch = vi.fn();
 global.fetch = mockFetch as unknown as typeof fetch;
@@ -22,11 +25,11 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { success: true } }),
+        text: async () => JSON.stringify({ data: { success: true } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
-      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as any);
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/auth/session",
@@ -45,13 +48,13 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { classes: [] } }),
+        text: async () => JSON.stringify({ data: { classes: [] } }),
       });
 
       const request = new NextRequest(
         "http://localhost:3000/api/v1/classes?page=2&limit=20"
       );
-      await GET(request, { params: Promise.resolve({ path: ["classes"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["classes"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/classes?page=2&limit=20",
@@ -66,7 +69,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { token: "abc123" } }),
+        text: async () => JSON.stringify({ data: { token: "abc123" } }),
       });
 
       const body = JSON.stringify({ email: "test@example.com", password: "secret" });
@@ -76,7 +79,7 @@ describe("API Proxy Route Handler", () => {
         headers: { "content-type": "application/json" },
       });
 
-      await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as any);
+      await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/auth/session-login",
@@ -94,7 +97,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { updated: true } }),
+        text: async () => JSON.stringify({ data: { updated: true } }),
       });
 
       const body = JSON.stringify({ name: "Updated Class" });
@@ -109,7 +112,7 @@ describe("API Proxy Route Handler", () => {
 
       await PUT(request, {
         params: Promise.resolve({ path: ["classes", "123", "rubric"] }),
-      } as any);
+      } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/classes/123/rubric",
@@ -127,7 +130,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { updated: true } }),
+        text: async () => JSON.stringify({ data: { updated: true } }),
       });
 
       const body = JSON.stringify({ typedText: "New content" });
@@ -142,7 +145,7 @@ describe("API Proxy Route Handler", () => {
 
       await PATCH(request, {
         params: Promise.resolve({ path: ["classes", "123", "assignments", "456", "submission", "draft"] }),
-      } as any);
+      } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/classes/123/assignments/456/submission/draft",
@@ -160,7 +163,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { deleted: true } }),
+        text: async () => JSON.stringify({ data: { deleted: true } }),
       });
 
       const request = new NextRequest(
@@ -168,7 +171,7 @@ describe("API Proxy Route Handler", () => {
         { method: "DELETE" }
       );
 
-      await DELETE(request, { params: Promise.resolve({ path: ["submission-files", "file123"] }) } as any);
+      await DELETE(request, { params: Promise.resolve({ path: ["submission-files", "file123"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/submission-files/file123",
@@ -185,7 +188,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { success: true } }),
+        text: async () => JSON.stringify({ data: { success: true } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session-login", {
@@ -194,7 +197,7 @@ describe("API Proxy Route Handler", () => {
         headers: { "x-csrf-token": "csrf-token-123", "content-type": "application/json" },
       });
 
-      await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as any);
+      await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -208,14 +211,14 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: { authenticated: true } }),
+        text: async () => JSON.stringify({ data: { authenticated: true } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session", {
         headers: { cookie: "session=abc123" },
       });
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -232,7 +235,7 @@ describe("API Proxy Route Handler", () => {
           "content-type": "application/json",
           "set-cookie": "__Host-eduflux.session=xyz789; Path=/; Secure; HttpOnly; SameSite=Lax",
         }),
-        json: async () => ({ data: { success: true } }),
+        text: async () => JSON.stringify({ data: { success: true } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session-login", {
@@ -241,7 +244,7 @@ describe("API Proxy Route Handler", () => {
         headers: { "content-type": "application/json" },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as any);
+      const response = await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as TestParams);
 
       expect(response.headers.get("set-cookie")).toBe(
         "__Host-eduflux.session=xyz789; Path=/; Secure; HttpOnly; SameSite=Lax"
@@ -261,7 +264,7 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers,
-        json: async () => ({ data: { success: true } }),
+        text: async () => JSON.stringify({ data: { success: true } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session-login", {
@@ -270,7 +273,7 @@ describe("API Proxy Route Handler", () => {
         headers: { "content-type": "application/json" },
       });
 
-      const response = await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as any);
+      const response = await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as TestParams);
 
       const setCookies = response.headers.getSetCookie();
       expect(setCookies).toHaveLength(2);
@@ -285,12 +288,12 @@ describe("API Proxy Route Handler", () => {
         ok: false,
         status: 401,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ error: { code: "UNAUTHORIZED", message: "Not authenticated" } }),
+        text: async () => JSON.stringify({ error: { code: "UNAUTHORIZED", message: "Not authenticated" } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
 
-      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as any);
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
 
       expect(response.status).toBe(401);
     });
@@ -302,12 +305,12 @@ describe("API Proxy Route Handler", () => {
         ok: false,
         status: 500,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ error: { code: "INTERNAL_ERROR", message: "Server error" } }),
+        text: async () => JSON.stringify({ error: { code: "INTERNAL_ERROR", message: "Server error" } }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/classes");
 
-      const response = await GET(request, { params: Promise.resolve({ path: ["classes"] }) } as any);
+      const response = await GET(request, { params: Promise.resolve({ path: ["classes"] }) } as TestParams);
 
       expect(response.status).toBe(500);
     });
@@ -319,12 +322,12 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/auth/csrf",
@@ -339,14 +342,14 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf", {
         headers: { host: "localhost:3000" },
       });
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -360,12 +363,12 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -381,14 +384,14 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/session", {
         headers: { cookie: "session=abc123" },
       });
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -402,14 +405,14 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf", {
         method: "OPTIONS",
       });
 
-      await OPTIONS(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await OPTIONS(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/auth/csrf",
@@ -428,7 +431,7 @@ describe("API Proxy Route Handler", () => {
         method: "HEAD",
       });
 
-      const response = await HEAD(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      const response = await HEAD(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       expect(mockFetch).toHaveBeenCalledWith(
         "https://eduflux-api.vercel.app/api/v1/auth/csrf",
@@ -445,12 +448,12 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -465,12 +468,12 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
@@ -486,17 +489,322 @@ describe("API Proxy Route Handler", () => {
         ok: true,
         status: 200,
         headers: new Headers({ "content-type": "application/json" }),
-        json: async () => ({ data: {} }),
+        text: async () => JSON.stringify({ data: {} }),
       });
 
       const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
 
-      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as any);
+      await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
 
       const fetchCall = mockFetch.mock.calls[0];
       if (!fetchCall) throw new Error("Expected fetch to be called");
       const url = fetchCall[0];
       expect(url).toBe("http://localhost:5000/api/v1/auth/csrf");
+    });
+  });
+
+  describe("Compression regression tests", () => {
+    it("should strip Content-Encoding from gzip upstream response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "content-encoding": "gzip",
+          "content-length": "123",
+        }),
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("content-length")).toBeNull();
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should strip Content-Encoding from brotli upstream response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "content-encoding": "br",
+          "content-length": "456",
+        }),
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("content-length")).toBeNull();
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should strip Content-Encoding from deflate upstream response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "content-encoding": "deflate",
+          "content-length": "789",
+        }),
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("content-length")).toBeNull();
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should handle plain uncompressed response correctly", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+        }),
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should strip transfer-encoding from upstream response", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "transfer-encoding": "chunked",
+        }),
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("transfer-encoding")).toBeNull();
+    });
+  });
+
+  describe("Rubric generation endpoint test", () => {
+    it("should handle rubric generation response correctly", async () => {
+      const rubricResponse = {
+        data: {
+          rubric: {
+            criteria: [
+              { id: "c1", name: "Content", description: "Quality of content", maxPoints: 10 },
+              { id: "c2", name: "Grammar", description: "Grammar and spelling", maxPoints: 5 },
+            ],
+          },
+        },
+      };
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "content-encoding": "gzip",
+          "content-length": "1024",
+        }),
+        text: async () => JSON.stringify(rubricResponse),
+      });
+
+      const request = new NextRequest(
+        "http://localhost:3000/api/v1/classes/class123/assignments/assign456/rubric/generate",
+        {
+          method: "POST",
+          body: JSON.stringify({ prompt: "Generate rubric for essay" }),
+          headers: { "content-type": "application/json" },
+        }
+      );
+
+      const response = await POST(request, {
+        params: Promise.resolve({
+          path: ["classes", "class123", "assignments", "assign456", "rubric", "generate"],
+        }),
+      } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("content-encoding")).toBeNull();
+      expect(response.headers.get("content-length")).toBeNull();
+      expect(response.headers.get("content-type")).toBe("application/json");
+
+      const body = await response.text();
+      const parsedBody = JSON.parse(body);
+      expect(parsedBody).toEqual(rubricResponse);
+    });
+  });
+
+  describe("Auth endpoint regression tests", () => {
+    it("should handle CSRF endpoint correctly", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+          "set-cookie": "csrf-token=abc123; Path=/; Secure; HttpOnly; SameSite=Lax",
+        }),
+        text: async () => JSON.stringify({ data: { csrfToken: "abc123" } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/csrf");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "csrf"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      expect(response.headers.get("set-cookie")).toContain("csrf-token=abc123");
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should handle session-login endpoint correctly", async () => {
+      const headers = new Headers({
+        "content-type": "application/json",
+      });
+      headers.append("set-cookie", "__Host-eduflux.session=xyz789; Path=/; Secure; HttpOnly; SameSite=Lax");
+      headers.append("set-cookie", "csrf-token=updated456; Path=/; Secure; HttpOnly");
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers,
+        text: async () => JSON.stringify({ data: { success: true } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session-login", {
+        method: "POST",
+        body: JSON.stringify({ email: "test@example.com", password: "secret" }),
+        headers: { "content-type": "application/json" },
+      });
+
+      const response = await POST(request, { params: Promise.resolve({ path: ["auth", "session-login"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      const setCookies = response.headers.getSetCookie();
+      expect(setCookies).toHaveLength(2);
+      expect(setCookies[0]).toContain("__Host-eduflux.session=xyz789");
+      expect(setCookies[1]).toContain("csrf-token=updated456");
+
+      const body = await response.text();
+      expect(() => JSON.parse(body)).not.toThrow();
+    });
+
+    it("should handle session endpoint correctly", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({
+          "content-type": "application/json",
+        }),
+        text: async () => JSON.stringify({ data: { user: { id: "user123", email: "test@example.com" } } }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+      const response = await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      const parsedBody = JSON.parse(body);
+      expect(parsedBody.data.user.email).toBe("test@example.com");
+    });
+  });
+
+  describe("204 and HEAD response handling", () => {
+    it("should handle 204 No Content response without body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 204,
+        headers: new Headers({}),
+        text: async () => "",
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/resource/123", {
+        method: "DELETE",
+      });
+
+      const response = await DELETE(request, { params: Promise.resolve({ path: ["resource", "123"] }) } as TestParams);
+
+      expect(response.status).toBe(204);
+      const body = await response.text();
+      expect(body).toBe("");
+    });
+
+    it("should handle HEAD request without body", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/resource/123", {
+        method: "HEAD",
+      });
+
+      const response = await HEAD(request, { params: Promise.resolve({ path: ["resource", "123"] }) } as TestParams);
+
+      expect(response.status).toBe(200);
+      const body = await response.text();
+      expect(body).toBe("");
+    });
+  });
+
+  describe("Request Accept-Encoding handling", () => {
+    it("should not forward browser Accept-Encoding header", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: async () => JSON.stringify({ data: {} }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session", {
+        headers: { "accept-encoding": "gzip, deflate, br" },
+      });
+
+      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      const fetchCall = mockFetch.mock.calls[0];
+      if (!fetchCall) throw new Error("Expected fetch to be called");
+      expect(fetchCall[1].headers.get("accept-encoding")).toBe("identity");
+    });
+
+    it("should set Accept-Encoding: identity for upstream request", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        status: 200,
+        headers: new Headers({ "content-type": "application/json" }),
+        text: async () => JSON.stringify({ data: {} }),
+      });
+
+      const request = new NextRequest("http://localhost:3000/api/v1/auth/session");
+
+      await GET(request, { params: Promise.resolve({ path: ["auth", "session"] }) } as TestParams);
+
+      const fetchCall = mockFetch.mock.calls[0];
+      if (!fetchCall) throw new Error("Expected fetch to be called");
+      expect(fetchCall[1].headers.get("accept-encoding")).toBe("identity");
     });
   });
 });
