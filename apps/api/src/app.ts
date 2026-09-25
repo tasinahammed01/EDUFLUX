@@ -1,7 +1,8 @@
 import cors from "cors";
 import cookieParser from "cookie-parser";
 import express from "express";
-import helmet from "helmet";
+import * as helmetModule from "helmet";
+const helmet = helmetModule.default;
 import { pinoHttp } from "pino-http";
 import { randomUUID } from "node:crypto";
 import type { HealthResponse } from "@eduflux/shared-types";
