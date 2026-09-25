@@ -11,7 +11,7 @@ function setEnvironment(overrides: Record<string, string | undefined>) {
     MONGODB_URI: "mongodb://127.0.0.1:27017/eduflux-test",
     CSRF_SECRET: "test-csrf-secret-at-least-32-characters"
   };
-  for (const key of ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY", "GOOGLE_APPLICATION_CREDENTIALS"]) {
+  for (const key of ["FIREBASE_PROJECT_ID", "FIREBASE_CLIENT_EMAIL", "FIREBASE_PRIVATE_KEY", "GOOGLE_APPLICATION_CREDENTIALS", "GOOGLE_CLOUD_CREDENTIALS_JSON"]) {
     delete process.env[key];
   }
   for (const [key, value] of Object.entries(overrides)) {
@@ -73,5 +73,94 @@ describe("Firebase credential validation", () => {
     });
 
     await expect(loadEnv()).resolves.toMatchObject({ NODE_ENV: "test" });
+  });
+});
+
+describe("Provider-specific credential validation", () => {
+  it("requires OPENROUTER_API_KEY when AI_PROVIDER is openrouter", async () => {
+    setEnvironment({
+      AI_PROVIDER: "openrouter",
+      OPENROUTER_API_KEY: undefined
+    });
+
+    await expect(loadEnv()).rejects.toThrow("OPENROUTER_API_KEY is required when AI_PROVIDER=openrouter.");
+  });
+
+  it("accepts OPENROUTER_API_KEY when AI_PROVIDER is openrouter", async () => {
+    setEnvironment({
+      AI_PROVIDER: "openrouter",
+      OPENROUTER_API_KEY: "sk-or-v1-1234567890123456789012345678901234567890",
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ AI_PROVIDER: "openrouter" });
+  });
+
+  it("rejects AI_API_KEY when AI_PROVIDER is openrouter", async () => {
+    setEnvironment({
+      AI_PROVIDER: "openrouter",
+      OPENROUTER_API_KEY: "sk-or-123",
+      AI_API_KEY: "sk-123"
+    });
+
+    await expect(loadEnv()).rejects.toThrow("Use OPENROUTER_API_KEY instead of AI_API_KEY when AI_PROVIDER=openrouter.");
+  });
+
+  it("does not require OCR_API_KEY when OCR_PROVIDER is google-vision", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_APPLICATION_CREDENTIALS: fileURLToPath(new URL("../../package.json", import.meta.url)),
+      OCR_API_KEY: undefined
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("does not require OCR_MODEL when OCR_PROVIDER is google-vision", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_APPLICATION_CREDENTIALS: fileURLToPath(new URL("../../package.json", import.meta.url)),
+      OCR_MODEL: undefined
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("requires GOOGLE_CLOUD_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS when OCR_PROVIDER is google-vision", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      GOOGLE_CLOUD_CREDENTIALS_JSON: undefined
+    });
+
+    await expect(loadEnv()).rejects.toThrow("GOOGLE_CLOUD_CREDENTIALS_JSON or GOOGLE_APPLICATION_CREDENTIALS is required when OCR_PROVIDER=google-vision.");
+  });
+
+  it("accepts GOOGLE_CLOUD_CREDENTIALS_JSON when OCR_PROVIDER is google-vision", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"key","project_id":"test"}',
+      GOOGLE_APPLICATION_CREDENTIALS: undefined,
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
+  });
+
+  it("prefers GOOGLE_CLOUD_CREDENTIALS_JSON over GOOGLE_APPLICATION_CREDENTIALS", async () => {
+    setEnvironment({
+      OCR_PROVIDER: "google-vision",
+      GOOGLE_CLOUD_CREDENTIALS_JSON: '{"client_email":"test@example.com","private_key":"key","project_id":"test"}',
+      GOOGLE_APPLICATION_CREDENTIALS: "nonexistent.json",
+      FIREBASE_PROJECT_ID: "test-project",
+      FIREBASE_CLIENT_EMAIL: "test@example.com",
+      FIREBASE_PRIVATE_KEY: "private-key"
+    });
+
+    await expect(loadEnv()).resolves.toMatchObject({ OCR_PROVIDER: "google-vision" });
   });
 });

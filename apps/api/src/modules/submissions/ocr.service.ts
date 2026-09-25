@@ -2,6 +2,7 @@ import vision from "@google-cloud/vision";
 import { createCanvas } from "@napi-rs/canvas";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { env } from "../../config/env.js";
+import { readLocalGoogleCredentialConfig, normalizePrivateKey } from "../../config/google-credentials.js";
 import { getObjectStorage } from "../../storage/object-storage.js";
 import type { SubmissionFileRecord } from "./submission-file.model.js";
 
@@ -55,7 +56,27 @@ export class GoogleVisionOcrProvider implements OcrProvider {
     const storage = await getObjectStorage();
     const detected: Array<{ sourceFileId: string; pageNumber: number; page: VisionPage }> = [];
     try {
-      const client = this.client ??= new vision.ImageAnnotatorClient({ keyFilename: env.GOOGLE_APPLICATION_CREDENTIALS! });
+      if (!this.client) {
+        const credentialConfig = readLocalGoogleCredentialConfig();
+        if (credentialConfig.source === "GOOGLE_CLOUD_CREDENTIALS_JSON" && credentialConfig.credentials) {
+          const { client_email, private_key, project_id } = credentialConfig.credentials;
+          if (!client_email || !private_key || !project_id) {
+            throw new OcrProviderError("Google Vision JSON credentials missing required fields", "OCR_PROVIDER_CONFIG_ERROR");
+          }
+          this.client = new vision.ImageAnnotatorClient({
+            credentials: {
+              client_email,
+              private_key: normalizePrivateKey(private_key),
+              project_id,
+            },
+          });
+        } else if (credentialConfig.resolvedPath) {
+          this.client = new vision.ImageAnnotatorClient({ keyFilename: credentialConfig.resolvedPath });
+        } else {
+          throw new OcrProviderError("Google Vision credentials not configured", "OCR_PROVIDER_CONFIG_ERROR");
+        }
+      }
+      const client = this.client;
       for (const file of files) {
         const bytes = Buffer.from(await storage.getObject(file.objectKey));
         const images = file.mimeType === "application/pdf" ? await renderPdf(bytes) : [bytes];

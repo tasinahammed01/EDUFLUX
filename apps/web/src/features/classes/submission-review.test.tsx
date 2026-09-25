@@ -177,6 +177,7 @@ describe("SubmissionReview", () => {
       ...review,
       typedText: "",
       transcribedText: "Their is a claim.",
+      effectiveText: "Their is a claim.",
       files: [
         {
           id: "file",
@@ -195,6 +196,8 @@ describe("SubmissionReview", () => {
           sourceFileId: "file",
           wordIds: ["f1_p1_w0001"],
           pageNumbers: [1],
+          startIndex: 0,
+          endIndex: 8,
         },
       ],
       ocrPages: [
@@ -284,7 +287,7 @@ describe("SubmissionReview", () => {
     );
     expect(await screen.findByText("Preview unavailable")).toBeVisible();
     expect(
-      screen.getByRole("link", { name: "Open original file" }),
+      screen.getByRole("link", { name: /Original/ }),
     ).toHaveAttribute("href", files[1]!.contentUrl);
   });
   it("renders every OCR page in one full-width transcription document", () => {
@@ -357,5 +360,611 @@ describe("SubmissionReview", () => {
     expect(
       screen.queryByRole("dialog", { name: "Correction Legend" }),
     ).not.toBeInTheDocument();
+  });
+  it("mobile annotations have data-show-label attribute for CSS control", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    expect(annotation).toBeInTheDocument();
+    // Check that the annotation has the data attribute for CSS control
+    expect(annotation).toHaveAttribute("data-show-label", "false");
+  });
+  it("selected issue shows its code badge", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    await userEvent.click(annotation);
+    expect(annotation).toHaveClass("selected");
+    // Badge should be visible when selected
+    const badge = annotation.querySelector("span");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent("AGR");
+  });
+  it("tapping an annotation opens correction details", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    await userEvent.click(annotation);
+    expect(
+      screen.getByRole("dialog", { name: "Correction AGR" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Correction AGR" }),
+    ).toHaveClass("review-error-popover");
+  });
+  it("transcript and image share selected issue state", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "Their is a claim.",
+      effectiveText: "Their is a claim.",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+          startIndex: 0,
+          endIndex: 8,
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    // Select from transcript
+    await userEvent.click(
+      screen.getByRole("button", {
+        name: "Their is: Use the existential form.",
+      }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Correction AGR" }),
+    ).toBeInTheDocument();
+    await userEvent.keyboard("{Escape}");
+    // Switch to image view
+    await userEvent.click(
+      screen.getByRole("button", { name: "View Uploaded Work" }),
+    );
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    // Annotation should not be selected since we closed the dialog
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    expect(annotation).not.toHaveClass("selected");
+  });
+  it("long filename is visually truncated but accessible via title attribute", async () => {
+    const longName = "handwriting_20260722_205021_via_10015_io.jpg";
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: longName,
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [],
+      ocrPages: [],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: `Submitted file ${longName}` }),
+    );
+    const filename = screen.getByText(longName);
+    expect(filename).toBeInTheDocument();
+    expect(filename).toHaveAttribute("title", longName);
+  });
+  it("original file link is preserved and accessible", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [],
+      ocrPages: [],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const originalLink = screen.getByRole("link", { name: /Original/ });
+    expect(originalLink).toBeInTheDocument();
+    expect(originalLink).toHaveAttribute(
+      "href",
+      "https://example.test/work.png",
+    );
+    expect(originalLink).toHaveAttribute("target", "_blank");
+  });
+  it("desktop label behavior is preserved via data attribute", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    // Check that the annotation has the data attribute for CSS control
+    expect(annotation).toHaveAttribute("data-show-label", "false");
+    // The badge element exists in DOM but may be hidden via CSS
+    const badge = annotation.querySelector("span");
+    expect(badge).toBeInTheDocument();
+    expect(badge).toHaveTextContent("AGR");
+  });
+  it("annotation geometry remains unchanged after selection", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    // Check initial geometry
+    expect(annotation).toHaveStyle({
+      left: "10%",
+      top: "20%",
+      width: "25%",
+      height: "10%",
+    });
+    // Select the annotation
+    await userEvent.click(annotation);
+    // Geometry should remain unchanged
+    expect(annotation).toHaveStyle({
+      left: "10%",
+      top: "20%",
+      width: "25%",
+      height: "10%",
+    });
+  });
+  it("multiple page annotations remain isolated to correct page", async () => {
+    const files = ["page-one.png", "page-two.png"].map(
+      (originalName, index) => ({
+        id: `file-${index}`,
+        originalName,
+        mimeType: "image/png" as const,
+        sizeBytes: 10,
+        status: "READY" as const,
+        createdAt: review.submittedAt,
+        contentUrl: `https://example.test/${originalName}`,
+      }),
+    );
+    const multiPageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "Their is a claim.", // Add transcribed text so it defaults to text mode
+      effectiveText: "Their is a claim.",
+      files,
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file-0",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+        {
+          ...review.issues[0]!,
+          id: "i2",
+          source: "OCR_FILE",
+          sourceFileId: "file-1",
+          wordIds: ["f2_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file-0",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+        {
+          sourceFileId: "file-1",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f2_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={multiPageReview} />);
+    await userEvent.click(
+      screen.getByRole("button", { name: "View Uploaded Work" }),
+    );
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file page-one.png" }),
+    );
+    // Only first page annotation should be visible
+    expect(
+      screen.getAllByRole("button", { name: /AGR: Use the existential form/ }),
+    ).toHaveLength(1);
+    // Switch to second page
+    await userEvent.click(screen.getByRole("button", { name: "Page 2" }));
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file page-two.png" }),
+    );
+    // Only second page annotation should be visible
+    expect(
+      screen.getAllByRole("button", { name: /AGR: Use the existential form/ }),
+    ).toHaveLength(1);
+  });
+  it("labels toggle button controls annotation badge visibility", async () => {
+    const imageReview: SubmissionReviewDto = {
+      ...review,
+      typedText: "",
+      transcribedText: "", // No transcribed text so it defaults to file mode
+      effectiveText: "",
+      files: [
+        {
+          id: "file",
+          originalName: "work.png",
+          mimeType: "image/png",
+          sizeBytes: 10,
+          status: "READY",
+          createdAt: review.submittedAt,
+          contentUrl: "https://example.test/work.png",
+        },
+      ],
+      issues: [
+        {
+          ...review.issues[0]!,
+          source: "OCR_FILE",
+          sourceFileId: "file",
+          wordIds: ["f1_p1_w0001"],
+          pageNumbers: [1],
+        },
+      ],
+      ocrPages: [
+        {
+          sourceFileId: "file",
+          pageNumber: 1,
+          width: 1000,
+          height: 500,
+          startOffset: 0,
+          endOffset: 17,
+          text: "Their is a claim.",
+          words: [
+            {
+              id: "f1_p1_w0001",
+              text: "Their",
+              startOffset: 0,
+              endOffset: 5,
+              boundingBox: { x: 0.1, y: 0.2, width: 0.25, height: 0.1 },
+            },
+          ],
+        },
+      ],
+    };
+    render(<SubmissionReview review={imageReview} />);
+    fireEvent.load(
+      screen.getByRole("img", { name: "Submitted file work.png" }),
+    );
+    const annotation = screen.getByRole("button", {
+      name: /AGR: Use the existential form/,
+    });
+    // Initially labels should be off
+    expect(annotation).toHaveAttribute("data-show-label", "false");
+    // Toggle labels on
+    const toggleButton = screen.getByRole("button", { name: "Labels OFF" });
+    await userEvent.click(toggleButton);
+    expect(annotation).toHaveAttribute("data-show-label", "true");
+    // Toggle labels off
+    await userEvent.click(screen.getByRole("button", { name: "Labels ON" }));
+    expect(annotation).toHaveAttribute("data-show-label", "false");
   });
 });

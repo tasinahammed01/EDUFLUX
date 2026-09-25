@@ -4,6 +4,7 @@ import { UserModel } from "../users/user.model.js";
 import { ApiError } from "../../utils/api-error.js";
 import { env } from "../../config/env.js";
 import { getObjectStorage } from "../../storage/object-storage.js";
+import { scheduleBackgroundTask } from "../../infrastructure/background-scheduler.js";
 import { SubmissionModel } from "./submission.model.js";
 import { SubmissionAttemptModel } from "./submission-attempt.model.js";
 import { SubmissionFileModel } from "./submission-file.model.js";
@@ -98,8 +99,8 @@ export async function ensureEvaluation(attemptId: string) {
 
 export function queueEvaluation(attemptId: string) {
   evaluationLogger.info({ attemptId }, "[evaluation] queued");
-  setImmediate(() => {
-    void processEvaluation(attemptId).catch((error: unknown) => {
+  scheduleBackgroundTask(
+    processEvaluation(attemptId).catch((error: unknown) => {
       evaluationLogger.error(
         {
           attemptId,
@@ -109,14 +110,14 @@ export function queueEvaluation(attemptId: string) {
         },
         "[evaluation] runner failed safely",
       );
-    });
-  });
+    }),
+  );
 }
 
 function queueAiRetry(attemptId: string, evaluationId: string) {
   evaluationLogger.info({ attemptId, evaluationId }, "[evaluation] AI retry queued");
-  setImmediate(() => {
-    void processEvaluation(attemptId, {
+  scheduleBackgroundTask(
+    processEvaluation(attemptId, {
       reusePersistedOcr: true,
       claimedEvaluationId: evaluationId,
     }).catch((error: unknown) => {
@@ -130,8 +131,8 @@ function queueAiRetry(attemptId: string, evaluationId: string) {
         },
         "[evaluation] AI retry runner failed safely",
       );
-    });
-  });
+    }),
+  );
 }
 
 export async function processEvaluation(

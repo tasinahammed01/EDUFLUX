@@ -1,5 +1,7 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
   "framework": "express",
-  "outputDirectory": null
+  "buildCommand": "cd ../.. && npx turbo build --filter=@eduflux/api",
+  "devCommand": "cd ../.. && npx turbo dev --filter=@eduflux/api",
+  "installCommand": "cd ../.. && npx pnpm install"
 }

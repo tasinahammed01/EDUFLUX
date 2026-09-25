@@ -44,6 +44,7 @@ export function SubmissionReview({
     [legendOpen, setLegendOpen] = useState(false);
   const [issueAnchor, setIssueAnchor] = useState<DOMRect | null>(null);
   const [retrying, setRetrying] = useState(false);
+  const [showLabels, setShowLabels] = useState(false);
   const refreshedFiles = useRef(new Set<string>());
   const refreshFile = async (fileId: string) => {
     if (!onRefreshFiles || refreshedFiles.current.has(fileId)) return false;
@@ -179,6 +180,8 @@ export function SubmissionReview({
                     selectedIssueId={null}
                     onSelectIssue={() => undefined}
                     onPreviewError={refreshFile}
+                    showLabels={false}
+                    onToggleLabels={() => undefined}
                   />
                 ) : (
                   <ReviewText
@@ -273,6 +276,8 @@ export function SubmissionReview({
                   selectedIssueId={selectedIssueId}
                   onSelectIssue={selectIssue}
                   onPreviewError={refreshFile}
+                  showLabels={showLabels}
+                  onToggleLabels={() => setShowLabels(!showLabels)}
                 />
               ) : (
                 <ReviewText
@@ -502,6 +507,8 @@ function ReviewFile({
   selectedIssueId,
   onSelectIssue,
   onPreviewError,
+  showLabels,
+  onToggleLabels,
 }: {
   review: SubmissionReviewDto;
   file: SubmissionReviewDto["files"][number];
@@ -514,6 +521,8 @@ function ReviewFile({
   selectedIssueId: string | null;
   onSelectIssue: SelectIssue;
   onPreviewError: (fileId: string) => Promise<boolean>;
+  showLabels: boolean;
+  onToggleLabels: () => void;
 }) {
   return (
     <div className="review-file">
@@ -557,6 +566,7 @@ function ReviewFile({
           selectedIssueId={selectedIssueId}
           onSelectIssue={onSelectIssue}
           onPreviewError={() => onPreviewError(file.id)}
+          showLabels={showLabels}
         />
       ) : (
         <iframe
@@ -564,10 +574,31 @@ function ReviewFile({
           title={file.originalName}
         />
       )}
-      <small className="review-active-filename">{file.originalName}</small>
-      <a href={file.contentUrl} target="_blank" rel="noreferrer">
-        Open original file
-      </a>
+      <div className="review-file-footer">
+        <small className="review-active-filename" title={file.originalName}>
+          {file.originalName}
+        </small>
+        <div className="review-file-actions">
+          <button
+            type="button"
+            className="review-label-toggle"
+            onClick={onToggleLabels}
+            aria-pressed={showLabels}
+            title={showLabels ? "Hide error codes" : "Show error codes"}
+          >
+            Labels {showLabels ? "ON" : "OFF"}
+          </button>
+          <a
+            href={file.contentUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="review-original-link"
+          >
+            <FileImage />
+            Original
+          </a>
+        </div>
+      </div>
     </div>
   );
 }
@@ -579,6 +610,7 @@ function ReviewImage({
   selectedIssueId,
   onSelectIssue,
   onPreviewError,
+  showLabels,
 }: {
   src: string | undefined;
   name: string;
@@ -587,6 +619,7 @@ function ReviewImage({
   selectedIssueId: string | null;
   onSelectIssue: SelectIssue;
   onPreviewError: () => Promise<boolean>;
+  showLabels: boolean;
 }) {
   const [loaded, setLoaded] = useState(false),
     [failed, setFailed] = useState(false);
@@ -632,11 +665,14 @@ function ReviewImage({
             issue.category,
             issue.label,
           );
+          const isSelected = selectedIssueId === issue.id;
+          const shouldShowLabel = showLabels || isSelected;
           return (
             <button
               key={`${issue.id}-${index}`}
               data-category={d.category}
-              className={`review-image-annotation${selectedIssueId === issue.id ? " selected" : ""}`}
+              data-show-label={shouldShowLabel}
+              className={`review-image-annotation${isSelected ? " selected" : ""}`}
               style={{
                 left: `${box.x * 100}%`,
                 top: `${box.y * 100}%`,

@@ -3,6 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=24.0.0"
+  },
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc -p tsconfig.json",
@@ -23,6 +26,7 @@
     "@eduflux/validation": "workspace:*",
     "@google-cloud/vision": "^6.1.0",
     "@napi-rs/canvas": "^1.0.9",
+    "@vercel/functions": "^1.5.0",
     "cookie-parser": "1.4.7",
     "cors": "2.8.6",
     "dotenv": "17.2.2",
