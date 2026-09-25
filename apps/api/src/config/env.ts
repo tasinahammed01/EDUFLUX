@@ -2,6 +2,9 @@ import "dotenv/config";
 import { existsSync } from "node:fs";
 import { z } from "zod";
 import { DEFAULT_API_PORT, DEFAULT_WEB_ORIGIN } from "@eduflux/config";
+import { readLocalGoogleCredentialConfig, validateCredentialFile } from "./google-credentials.js";
+
+const googleCredentials = readLocalGoogleCredentialConfig();
 
 const optionalString = <T extends z.ZodTypeAny>(schema: T) =>
   z.preprocess(
@@ -40,6 +43,7 @@ const schema = z
     FIREBASE_CLIENT_EMAIL: optionalString(z.string().email()),
     FIREBASE_PRIVATE_KEY: optionalString(z.string().min(1)),
     GOOGLE_APPLICATION_CREDENTIALS: optionalString(z.string().min(1)),
+    GOOGLE_CLOUD_KEY_FILE: optionalString(z.string().min(1)),
     FIREBASE_SESSION_TTL_DAYS: z.coerce
       .number()
       .int()
@@ -155,4 +159,7 @@ const schema = z
     }
   });
 
-export const env = schema.parse(process.env);
+const environment = { ...process.env, ...(googleCredentials.resolvedPath ? { GOOGLE_APPLICATION_CREDENTIALS: googleCredentials.resolvedPath } : {}) };
+export const env = schema.parse(environment);
+if (env.NODE_ENV !== "test" && env.OCR_PROVIDER === "google-vision") validateCredentialFile(env.GOOGLE_APPLICATION_CREDENTIALS!);
+export const googleCredentialSource = googleCredentials.source;

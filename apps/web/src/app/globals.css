@@ -161,6 +161,8 @@ button:focus-visible {
 .app-sidebar {
   grid-column: 1;
   grid-row: 1 / -1;
+  position: sticky;
+  top: 0;
   display: flex;
   height: 100svh;
   flex-direction: column;

@@ -200,7 +200,61 @@ export interface TeacherSubmissionRow {
   isLate?: boolean;
 }
 
-export type EvaluationStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+export type EvaluationStatus =
+  | "PENDING"
+  | "PROCESSING"
+  | "COMPLETED"
+  | "FAILED";
+export interface SubmissionReviewStatusDto {
+  status: EvaluationStatus;
+  processingStage?: EvaluationProcessingStage;
+  statusMessage?: string;
+  failureStage?: "OCR" | "AI_EVALUATION" | "VALIDATION" | "PERSISTENCE";
+  failureCode?: string;
+  updatedAt: string;
+}
+export const CORRECTION_LEGEND = {
+  REL: { label: "Relevance", category: "content" },
+  DEV: { label: "Idea Development", category: "content" },
+  TA: { label: "Task Achievement", category: "content" },
+  CL: { label: "Clarity of Ideas", category: "content" },
+  SD: { label: "Supporting Details", category: "content" },
+  COH: { label: "Coherence", category: "organization" },
+  CO: { label: "Cohesion", category: "organization" },
+  PU: { label: "Paragraph Unity", category: "organization" },
+  TS: { label: "Topic Sentence", category: "organization" },
+  CONC: { label: "Conclusion", category: "organization" },
+  T: { label: "Tense", category: "grammar" },
+  VF: { label: "Verb Form", category: "grammar" },
+  AGR: { label: "Subject–Verb Agreement", category: "grammar" },
+  FRAG: { label: "Sentence Fragment", category: "grammar" },
+  RO: { label: "Run-on Sentence", category: "grammar" },
+  WO: { label: "Word Order", category: "grammar" },
+  ART: { label: "Article Use", category: "grammar" },
+  PREP: { label: "Preposition", category: "grammar" },
+  WC: { label: "Word Choice", category: "vocabulary" },
+  WF: { label: "Word Form", category: "vocabulary" },
+  REP: { label: "Repetition", category: "vocabulary" },
+  FORM: { label: "Formal / Inappropriate Word", category: "vocabulary" },
+  COL: { label: "Collocation", category: "vocabulary" },
+  SP: { label: "Spelling", category: "mechanics" },
+  P: { label: "Punctuation", category: "mechanics" },
+  CAP: { label: "Capitalization", category: "mechanics" },
+  SPC: { label: "Spacing", category: "mechanics" },
+  FMT: { label: "Formatting", category: "mechanics" },
+} as const;
+export type CorrectionCode = keyof typeof CORRECTION_LEGEND;
+export type CorrectionCategory =
+  (typeof CORRECTION_LEGEND)[CorrectionCode]["category"];
+export const CORRECTION_CODES = Object.keys(
+  CORRECTION_LEGEND,
+) as CorrectionCode[];
+export type EvaluationProcessingStage =
+  | "PENDING"
+  | "OCR"
+  | "AI_EVALUATION"
+  | "FINALIZING"
+  | "COMPLETED";
 export interface SubmissionReviewIssue {
   id: string;
   code: string;
@@ -226,17 +280,32 @@ export interface OcrReviewWord {
   confidence?: number;
   boundingBox: { x: number; y: number; width: number; height: number };
 }
-export interface OcrReviewPage { sourceFileId: string; pageNumber: number; width: number; height: number; words: OcrReviewWord[] }
+export interface OcrReviewPage {
+  sourceFileId: string;
+  pageNumber: number;
+  width: number;
+  height: number;
+  startOffset: number;
+  endOffset: number;
+  text: string;
+  words: OcrReviewWord[];
+}
 export interface SubmissionReviewDto {
   id: string;
   submissionId: string;
   attemptId: string;
   assignmentId: string;
   classId: string;
-  student: { id: string; displayName: string; email: string; photoURL?: string };
+  student: {
+    id: string;
+    displayName: string;
+    email: string;
+    photoURL?: string;
+  };
   attemptNumber: number;
   submittedAt: string;
   status: EvaluationStatus;
+  processingStage?: EvaluationProcessingStage;
   statusMessage?: string;
   failureStage?: "OCR" | "AI_EVALUATION" | "VALIDATION" | "PERSISTENCE";
   failureCode?: string;

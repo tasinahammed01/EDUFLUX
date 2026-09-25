@@ -1,9 +1,17 @@
 import pino from "pino";
 import { app } from "./app.js";
-import { env } from "./config/env.js";
+import { env, googleCredentialSource } from "./config/env.js";
+import { existsSync } from "node:fs";
 import { connectDatabase, disconnectDatabase } from "./config/database.js";
 
 const logger = pino({ level: env.LOG_LEVEL });
+
+if (env.NODE_ENV === "development") logger.info({
+  provider: env.OCR_PROVIDER,
+  credentialSource: googleCredentialSource,
+  credentialPath: env.GOOGLE_APPLICATION_CREDENTIALS,
+  credentialFileExists: Boolean(env.GOOGLE_APPLICATION_CREDENTIALS && existsSync(env.GOOGLE_APPLICATION_CREDENTIALS)),
+}, "OCR configuration");
 await connectDatabase();
 const server = app.listen(env.PORT, () => logger.info({ port: env.PORT, database: "connected" }, "EduFlux API listening"));
 

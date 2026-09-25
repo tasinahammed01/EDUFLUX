@@ -34,6 +34,7 @@ describe("Firebase Admin credential selection", () => {
     process.env = {
       ...originalEnv,
       NODE_ENV: "development",
+      OCR_PROVIDER: "openai",
       MONGODB_URI: "mongodb://127.0.0.1:27017/eduflux-test",
       CSRF_SECRET: "test-csrf-secret-at-least-32-characters",
       FIREBASE_PROJECT_ID: "eduflux-project",

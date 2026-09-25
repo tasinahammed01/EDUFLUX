@@ -218,6 +218,12 @@ export const submissionDraftSchema = z
     draftRevision: z.number().int().min(0).optional(),
   })
   .strict();
+export const submissionFileOrderSchema = z
+  .object({
+    fileIds: z.array(z.string().regex(/^[a-f\d]{24}$/i)).min(1).max(5),
+    draftRevision: z.number().int().min(0),
+  })
+  .strict();
 export const uploadIntentSchema = z
   .object({
     filename: z.string().trim().min(1).max(200),
@@ -265,6 +271,7 @@ export type UpdateClassInput = z.infer<typeof updateClassSchema>;
 export type AssignmentInput = z.infer<typeof assignmentInputSchema>;
 export type UpdateAssignmentInput = z.infer<typeof updateAssignmentSchema>;
 export type SubmissionDraftInput = z.infer<typeof submissionDraftSchema>;
+export type SubmissionFileOrderInput = z.infer<typeof submissionFileOrderSchema>;
 export type UploadIntentInput = z.infer<typeof uploadIntentSchema>;
 export type RubricInput = z.infer<typeof rubricSchema>;
 export type RubricTemplateInput = z.infer<typeof rubricTemplateSchema>;

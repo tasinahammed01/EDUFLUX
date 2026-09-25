@@ -6,6 +6,7 @@ import {
   rubricGenerateSchema,
   rubricSchema,
   submissionDraftSchema,
+  submissionFileOrderSchema,
   submissionQuerySchema,
   updateAssignmentSchema,
   uploadIntentSchema,
@@ -34,11 +35,21 @@ import {
   createUploadIntent,
   getStudentSubmission,
   saveDraft,
+  reorderDraftFiles,
   submitWork,
   teacherSubmissionDetail,
   teacherSubmissions,
 } from "../submissions/submission.service.js";
-import { saveTeacherComment, studentAttemptReview, studentReview, teacherAttemptReview, teacherReview } from "../submissions/submission-review.service.js";
+import {
+  saveTeacherComment,
+  retryStudentAttemptReview,
+  studentAttemptReview,
+  studentAttemptReviewStatus,
+  studentReview,
+  teacherAttemptReview,
+  teacherReview,
+  teacherReviewStatus,
+} from "../submissions/submission-review.service.js";
 import { generateRubricWithAI } from "./rubric-ai.service.js";
 import { saveRubric, getRubricWithLockStatus } from "./rubric.service.js";
 import { rubricAiRateLimit } from "../auth/rate-limits.js";
@@ -107,16 +118,79 @@ assignmentRouter.get(
   "/:assignmentId/submission/review",
   requireClassRole("STUDENT"),
   async (req, res, next) => {
-    try { sendData(res, await studentReview(String(req.params.assignmentId), req.classMembership!.classId, req.principal!.userId)); }
-    catch (error) { next(error); }
+    try {
+      sendData(
+        res,
+        await studentReview(
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.principal!.userId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+assignmentRouter.get(
+  "/:assignmentId/submissions/:submissionId/attempts/:attemptId/review/status",
+  requireClassRole("STUDENT"),
+  async (req, res, next) => {
+    try {
+      sendData(
+        res,
+        await studentAttemptReviewStatus(
+          String(req.params.submissionId),
+          String(req.params.attemptId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.principal!.userId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+assignmentRouter.post(
+  "/:assignmentId/submissions/:submissionId/attempts/:attemptId/review/retry",
+  requireCsrf,
+  requireClassRole("STUDENT"),
+  async (req, res, next) => {
+    try {
+      sendData(
+        res,
+        await retryStudentAttemptReview(
+          String(req.params.submissionId),
+          String(req.params.attemptId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.principal!.userId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
   },
 );
 assignmentRouter.get(
   "/:assignmentId/submissions/:submissionId/attempts/:attemptId/review",
   requireClassRole("STUDENT"),
   async (req, res, next) => {
-    try { sendData(res, await studentAttemptReview(String(req.params.submissionId), String(req.params.attemptId), String(req.params.assignmentId), req.classMembership!.classId, req.principal!.userId)); }
-    catch (error) { next(error); }
+    try {
+      sendData(
+        res,
+        await studentAttemptReview(
+          String(req.params.submissionId),
+          String(req.params.attemptId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.principal!.userId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
   },
 );
 assignmentRouter.patch(
@@ -129,6 +203,27 @@ assignmentRouter.patch(
       sendData(
         res,
         await saveDraft(
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.principal!.userId,
+          req.body,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+assignmentRouter.patch(
+  "/:assignmentId/submission/files/order",
+  requireCsrf,
+  requireClassRole("STUDENT"),
+  validateBody(submissionFileOrderSchema),
+  async (req, res, next) => {
+    try {
+      sendData(
+        res,
+        await reorderDraftFiles(
           String(req.params.assignmentId),
           req.classMembership!.classId,
           req.principal!.userId,
@@ -230,19 +325,58 @@ assignmentRouter.get(
   },
 );
 assignmentRouter.get(
+  "/:assignmentId/submissions/:submissionId/review/status",
+  requireClassRole("OWNER", "TEACHER"),
+  async (req, res, next) => {
+    try {
+      sendData(
+        res,
+        await teacherReviewStatus(
+          String(req.params.submissionId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
+  },
+);
+assignmentRouter.get(
   "/:assignmentId/submissions/:submissionId/review",
   requireClassRole("OWNER", "TEACHER"),
   async (req, res, next) => {
-    try { sendData(res, await teacherReview(String(req.params.submissionId), String(req.params.assignmentId), req.classMembership!.classId)); }
-    catch (error) { next(error); }
+    try {
+      sendData(
+        res,
+        await teacherReview(
+          String(req.params.submissionId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
   },
 );
 assignmentRouter.get(
   "/:assignmentId/submissions/:submissionId/attempts/:attemptId/teacher-review",
   requireClassRole("OWNER", "TEACHER"),
   async (req, res, next) => {
-    try { sendData(res, await teacherAttemptReview(String(req.params.submissionId), String(req.params.attemptId), String(req.params.assignmentId), req.classMembership!.classId)); }
-    catch (error) { next(error); }
+    try {
+      sendData(
+        res,
+        await teacherAttemptReview(
+          String(req.params.submissionId),
+          String(req.params.attemptId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
   },
 );
 assignmentRouter.post(
@@ -251,8 +385,19 @@ assignmentRouter.post(
   requireClassRole("OWNER", "TEACHER"),
   validateBody(teacherCommentSchema),
   async (req, res, next) => {
-    try { sendData(res, await saveTeacherComment(String(req.params.submissionId), String(req.params.assignmentId), req.classMembership!.classId, req.body.comment)); }
-    catch (error) { next(error); }
+    try {
+      sendData(
+        res,
+        await saveTeacherComment(
+          String(req.params.submissionId),
+          String(req.params.assignmentId),
+          req.classMembership!.classId,
+          req.body.comment,
+        ),
+      );
+    } catch (error) {
+      next(error);
+    }
   },
 );
 assignmentRouter.get("/:assignmentId", async (req, res, next) => {
@@ -354,20 +499,17 @@ assignmentRouter.delete(
 );
 
 // Rubric endpoints
-assignmentRouter.get(
-  "/:assignmentId/rubric",
-  async (req, res, next) => {
-    try {
-      const result = await getRubricWithLockStatus(
-        String(req.params.assignmentId),
-        req.classMembership!.classId,
-      );
-      sendData(res, result);
-    } catch (e) {
-      next(e);
-    }
-  },
-);
+assignmentRouter.get("/:assignmentId/rubric", async (req, res, next) => {
+  try {
+    const result = await getRubricWithLockStatus(
+      String(req.params.assignmentId),
+      req.classMembership!.classId,
+    );
+    sendData(res, result);
+  } catch (e) {
+    next(e);
+  }
+});
 
 assignmentRouter.put(
   "/:assignmentId/rubric",

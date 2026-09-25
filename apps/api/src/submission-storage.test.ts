@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { submissionDraftSchema, uploadIntentSchema } from "@eduflux/validation";
+import { submissionDraftSchema, submissionFileOrderSchema, uploadIntentSchema } from "@eduflux/validation";
 import {
   getObjectStorage,
   setObjectStorageForTests,
@@ -52,5 +52,11 @@ describe("submission upload boundaries", () => {
         fileIds: Array.from({ length: 6 }, () => "507f1f77bcf86cd799439011"),
       }).success,
     ).toBe(false);
+  });
+
+  it("requires a revisioned, duplicate-free file order payload", () => {
+    const id = "507f1f77bcf86cd799439011";
+    expect(submissionFileOrderSchema.safeParse({ fileIds: [id], draftRevision: 2 }).success).toBe(true);
+    expect(submissionFileOrderSchema.safeParse({ fileIds: [], draftRevision: 2 }).success).toBe(false);
   });
 });

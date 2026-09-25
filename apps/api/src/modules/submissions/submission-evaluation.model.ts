@@ -13,9 +13,12 @@ export interface SubmissionEvaluationRecord {
   rubricRevisionNumber?: number;
   sourceFileIds: Types.ObjectId[];
   status: "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
+  processingStage?: "PENDING" | "OCR" | "AI_EVALUATION" | "FINALIZING" | "COMPLETED";
   statusMessage?: string;
   failureStage?: "OCR" | "AI_EVALUATION" | "VALIDATION" | "PERSISTENCE";
   failureCode?: string;
+  aiRetryCount: number;
+  aiRetryRequestedAt?: Date;
   transcribedText: string;
   effectiveText: string;
   ocrMetadata?: { provider: string; model: string; processedFiles: number; completedAt?: Date };
@@ -43,9 +46,12 @@ const schema = new Schema<SubmissionEvaluationRecord>({
   rubricRevisionNumber: { type: Number, min: 1, immutable: true },
   sourceFileIds: { type: [Schema.Types.ObjectId], ref: "SubmissionFile", default: [], immutable: true },
   status: { type: String, enum: ["PENDING", "PROCESSING", "COMPLETED", "FAILED"], required: true, default: "PENDING" },
+  processingStage: { type: String, enum: ["PENDING", "OCR", "AI_EVALUATION", "FINALIZING", "COMPLETED"], default: "PENDING" },
   statusMessage: { type: String, maxlength: 500 },
   failureStage: { type: String, enum: ["OCR", "AI_EVALUATION", "VALIDATION", "PERSISTENCE"] },
   failureCode: { type: String, maxlength: 100 },
+  aiRetryCount: { type: Number, min: 0, max: 3, default: 0 },
+  aiRetryRequestedAt: Date,
   transcribedText: { type: String, default: "", maxlength: 500_000 },
   effectiveText: { type: String, default: "", maxlength: 600_000 },
   ocrMetadata: { provider: String, model: String, processedFiles: Number, completedAt: Date },

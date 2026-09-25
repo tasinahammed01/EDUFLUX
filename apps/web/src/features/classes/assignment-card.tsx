@@ -449,7 +449,7 @@ export function AssignmentCard({
                         className="button button-secondary button-small"
                         onClick={() => onStudentSubmit?.(assignment)}
                       >
-                        Submit Another Attempt
+                        Submit New Attempt
                       </button>
                     )}
                   </>

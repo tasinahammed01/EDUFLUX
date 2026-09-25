@@ -20,6 +20,12 @@ import { SubmissionModel } from "./modules/submissions/submission.model.js";
 import { SubmissionAttemptModel } from "./modules/submissions/submission-attempt.model.js";
 import { SubmissionFileModel } from "./modules/submissions/submission-file.model.js";
 import { SubmissionEvaluationModel } from "./modules/submissions/submission-evaluation.model.js";
+import {
+  OcrProviderError,
+  setOcrProviderForTests,
+} from "./modules/submissions/ocr.service.js";
+import { setEvaluationProviderForTests } from "./modules/submissions/evaluation.service.js";
+import { AIProviderError } from "./modules/ai/ai-provider.service.js";
 import { authRateLimit, joinRateLimit } from "./modules/auth/rate-limits.js";
 import { ipKeyGenerator } from "express-rate-limit";
 let replicaSet: MongoMemoryReplSet;
@@ -80,6 +86,8 @@ beforeAll(async () => {
   ]);
 }, 120_000);
 afterEach(async () => {
+  setOcrProviderForTests(undefined);
+  setEvaluationProviderForTests(undefined);
   vi.restoreAllMocks();
   for (const ip of ["::ffff:127.0.0.1", "::1"]) {
     const key = ipKeyGenerator(ip);
@@ -335,14 +343,18 @@ describe("class membership compatibility", () => {
     ).toHaveLength(0);
     csrfToken = await csrf(teacher);
     const rejectedPublish = await teacher
-      .post(`/api/v1/classes/${classId}/assignments/${draft.body.data.id}/publish`)
+      .post(
+        `/api/v1/classes/${classId}/assignments/${draft.body.data.id}/publish`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", csrfToken);
     expect(rejectedPublish.status).toBe(400);
     expect(rejectedPublish.body.error.code).toBe("RUBRIC_REQUIRED");
     // Add a rubric before publishing (now required)
     const savedRubric = await teacher
-      .put(`/api/v1/classes/${classId}/assignments/${draft.body.data.id}/rubric`)
+      .put(
+        `/api/v1/classes/${classId}/assignments/${draft.body.data.id}/rubric`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", csrfToken)
       .send({
@@ -353,26 +365,47 @@ describe("class membership compatibility", () => {
           { id: "excellent", label: "Excellent", percentage: 100 },
           { id: "good", label: "Good", percentage: 80 },
           { id: "satisfactory", label: "Satisfactory", percentage: 60 },
-          { id: "needs_improvement", label: "Needs Improvement", percentage: 40 },
+          {
+            id: "needs_improvement",
+            label: "Needs Improvement",
+            percentage: 40,
+          },
         ],
         criteria: [
           {
             id: "content",
             title: "Content",
             weight: 50,
-            descriptors: ["Excellent content", "Good content", "Satisfactory content", "Needs improvement"],
+            descriptors: [
+              "Excellent content",
+              "Good content",
+              "Satisfactory content",
+              "Needs improvement",
+            ],
           },
           {
             id: "organization",
             title: "Organization",
             weight: 50,
-            descriptors: ["Excellent organization", "Good organization", "Satisfactory organization", "Needs improvement"],
+            descriptors: [
+              "Excellent organization",
+              "Good organization",
+              "Satisfactory organization",
+              "Needs improvement",
+            ],
           },
         ],
       });
-    expect(savedRubric.body.data).toMatchObject({ status: "DRAFT", hasRubric: true, rubricRevisionNumber: 1 });
+    expect(savedRubric.body.data).toMatchObject({
+      status: "DRAFT",
+      hasRubric: true,
+      rubricRevisionNumber: 1,
+    });
     // Prove publishing reads the canonical immutable revision rather than the transitional embedded copy.
-    await AssignmentModel.updateOne({ _id: draft.body.data.id }, { $unset: { rubric: 1 } });
+    await AssignmentModel.updateOne(
+      { _id: draft.body.data.id },
+      { $unset: { rubric: 1 } },
+    );
     csrfToken = await csrf(teacher);
     expect(
       (
@@ -388,7 +421,14 @@ describe("class membership compatibility", () => {
       (await student.get(`/api/v1/classes/${classId}/assignments`)).body.data
         .assignments,
     ).toHaveLength(1);
-    expect((await teacher.get(`/api/v1/classes/${classId}/assignments`)).body.data.assignments[0]).toMatchObject({ status: "PUBLISHED", hasRubric: true, rubricRevisionNumber: 1 });
+    expect(
+      (await teacher.get(`/api/v1/classes/${classId}/assignments`)).body.data
+        .assignments[0],
+    ).toMatchObject({
+      status: "PUBLISHED",
+      hasRubric: true,
+      rubricRevisionNumber: 1,
+    });
     const rotated = await teacher
       .post(`/api/v1/classes/${classId}/invite/rotate`)
       .set("origin", origin)
@@ -501,7 +541,11 @@ describe("rubric revision and assignment safety", () => {
       .post("/api/v1/classes")
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf)
-      .send({ name: "Revision class", subjectLevel: "General", startDate: "2026-09-20" });
+      .send({
+        name: "Revision class",
+        subjectLevel: "General",
+        startDate: "2026-09-20",
+      });
     const classId = createdClass.body.data.id as string;
 
     const student = request.agent(app);
@@ -548,7 +592,11 @@ describe("rubric revision and assignment safety", () => {
       .set("x-csrf-token", teacherCsrf)
       .send(rubric());
     expect(response.status).toBe(200);
-    expect(response.body.data).toMatchObject({ hasRubric: true, rubricRevisionNumber: 1, maxScore: 100 });
+    expect(response.body.data).toMatchObject({
+      hasRubric: true,
+      rubricRevisionNumber: 1,
+      maxScore: 100,
+    });
     expect(await RubricRevisionModel.countDocuments({ assignmentId })).toBe(1);
 
     await teacher
@@ -564,15 +612,33 @@ describe("rubric revision and assignment safety", () => {
       .set("x-csrf-token", teacherCsrf)
       .send(rubric("Revised Essay Rubric"));
     expect(response.body.data.rubricRevisionNumber).toBe(2);
-    const revisions = await RubricRevisionModel.find({ assignmentId }).sort({ revisionNumber: 1 }).lean();
-    expect(revisions.map((item) => item.rubric.title)).toEqual(["Essay Rubric", "Revised Essay Rubric"]);
+    const revisions = await RubricRevisionModel.find({ assignmentId })
+      .sort({ revisionNumber: 1 })
+      .lean();
+    expect(revisions.map((item) => item.rubric.title)).toEqual([
+      "Essay Rubric",
+      "Revised Essay Rubric",
+    ]);
     await RubricRevisionModel.updateOne(
       { _id: revisions[0]!._id },
       { $set: { "rubric.title": "Tampered" } },
     );
-    expect((await RubricRevisionModel.findById(revisions[0]!._id).lean())?.rubric.title).toBe("Essay Rubric");
-    expect((await AssignmentModel.findById(assignmentId))?.currentRubricRevisionId?.toString()).toBe(revisions[1]?._id.toString());
-    expect((await teacher.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/rubric`)).body.data).toMatchObject({
+    expect(
+      (await RubricRevisionModel.findById(revisions[0]!._id).lean())?.rubric
+        .title,
+    ).toBe("Essay Rubric");
+    expect(
+      (
+        await AssignmentModel.findById(assignmentId)
+      )?.currentRubricRevisionId?.toString(),
+    ).toBe(revisions[1]?._id.toString());
+    expect(
+      (
+        await teacher.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/rubric`,
+        )
+      ).body.data,
+    ).toMatchObject({
       rubric: { title: "Revised Essay Rubric" },
       rubricRevisionNumber: 2,
       locked: false,
@@ -612,21 +678,83 @@ describe("rubric revision and assignment safety", () => {
       .set("x-csrf-token", teacherCsrf);
     expect(response.body.data.publishedAt).toBe(publishedAt);
     expect(await SubmissionModel.countDocuments()).toBe(0);
-    const studentList = await student.get(`/api/v1/classes/${classId}/assignments`);
-    expect(studentList.body.data.assignments[0].studentSubmission.submissionState).toBe("NONE");
+    const studentList = await student.get(
+      `/api/v1/classes/${classId}/assignments`,
+    );
+    expect(
+      studentList.body.data.assignments[0].studentSubmission.submissionState,
+    ).toBe("NONE");
     expect(studentList.body.data.assignments[0].rubric).toBeUndefined();
     expect(await SubmissionModel.countDocuments()).toBe(0);
 
-    const opened = await student.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission`);
-    const submissionId = opened.body.data.id as string;
+    const opened = await student.get(
+      `/api/v1/classes/${classId}/assignments/${assignmentId}/submission`,
+    );
+    expect(opened.body.data.id).toBe("");
+    expect(await SubmissionModel.countDocuments()).toBe(0);
+    const studentMembership = await ClassMembershipModel.findOne({
+      classId,
+      role: "STUDENT",
+    }).lean();
+    expect(studentMembership).toBeTruthy();
+    const submission = await SubmissionModel.create({
+      assignmentId,
+      classId,
+      studentUserId: studentMembership!.userId,
+      status: "DRAFT",
+      draftText: "",
+      draftFileIds: [],
+      draftRevision: 0,
+      latestAttemptNumber: 0,
+    });
+    const submissionId = submission._id.toString();
+    const file = await SubmissionFileModel.create({
+      ownerUserId: studentMembership!.userId,
+      classId,
+      assignmentId,
+      submissionId: submission._id,
+      objectKey: "integration/submission-file.pdf",
+      originalName: "essay.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 128,
+      status: "READY",
+      finalizedAt: new Date(),
+    });
     studentCsrf = await csrf(student);
-    await student
-      .patch(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission/draft`)
+    const emptySubmit = await student
+      .post(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/submit`,
+      )
+      .set("origin", origin)
+      .set("x-csrf-token", studentCsrf);
+    expect(emptySubmit.status).toBe(400);
+    expect(emptySubmit.body.error.code).toBe("SUBMISSION_FILE_REQUIRED");
+    const firstDraft = await student
+      .patch(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/draft`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", studentCsrf)
-      .send({ typedText: "My answer", fileIds: [], draftRevision: opened.body.data.draftRevision });
+      .send({
+        typedText: "",
+        fileIds: [file._id.toString()],
+        draftRevision: 0,
+      });
+    expect(firstDraft.status).toBe(200);
+    setOcrProviderForTests({
+      extract: vi
+        .fn()
+        .mockRejectedValue(
+          new OcrProviderError(
+            "Google Vision OCR request failed",
+            "OCR_PROVIDER_AUTH_FAILED",
+          ),
+        ),
+    });
     response = await student
-      .post(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission/submit`)
+      .post(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/submit`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", studentCsrf);
     expect(response.status).toBe(201);
@@ -636,57 +764,259 @@ describe("rubric revision and assignment safety", () => {
       evaluation: { status: "PENDING" },
     });
     const submittedAttemptId = response.body.data.attempt.id as string;
-    const attempt = await SubmissionAttemptModel.findOne({ assignmentId }).lean();
-    expect(attempt).toMatchObject({ rubricRevisionNumber: 2, rubricHash: revisions[1]?.rubricHash });
-    expect(attempt?.rubricRevisionId?.toString()).toBe(revisions[1]?._id.toString());
-    expect(await SubmissionEvaluationModel.findOne({ attemptId: submittedAttemptId }).lean()).toMatchObject({
+    let failedEvaluation;
+    for (let index = 0; index < 50; index++) {
+      failedEvaluation = await SubmissionEvaluationModel.findOne({
+        attemptId: submittedAttemptId,
+      }).lean();
+      if (failedEvaluation?.status === "FAILED") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(failedEvaluation).toMatchObject({
+      status: "FAILED",
+      failureStage: "OCR",
+      failureCode: "OCR_PROVIDER_AUTH_FAILED",
+    });
+    const failedReview = await student.get(
+      `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`,
+    );
+    expect(failedReview.status).toBe(200);
+    expect(failedReview.body.data).toMatchObject({
+      status: "FAILED",
+      failureCode: "OCR_PROVIDER_AUTH_FAILED",
+    });
+    const lightweightStatus = await student.get(
+      `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review/status`,
+    );
+    expect(lightweightStatus.status).toBe(200);
+    expect(lightweightStatus.body.data).toMatchObject({
+      status: "FAILED",
+      failureCode: "OCR_PROVIDER_AUTH_FAILED",
+    });
+    expect(lightweightStatus.body.data).not.toHaveProperty("ocrPages");
+    expect(lightweightStatus.body.data).not.toHaveProperty("transcribedText");
+    expect(lightweightStatus.body.data).not.toHaveProperty("files");
+    expect(lightweightStatus.body.data).not.toHaveProperty("issues");
+    expect(JSON.stringify(lightweightStatus.body).length).toBeLessThan(1_000);
+    expect((await student.get("/health/live")).status).toBe(200);
+    const attempt = await SubmissionAttemptModel.findOne({
+      assignmentId,
+    }).lean();
+    expect(attempt).toMatchObject({
+      rubricRevisionNumber: 2,
+      rubricHash: revisions[1]?.rubricHash,
+    });
+    expect(attempt?.rubricRevisionId?.toString()).toBe(
+      revisions[1]?._id.toString(),
+    );
+    expect(
+      await SubmissionEvaluationModel.findOne({
+        attemptId: submittedAttemptId,
+      }).lean(),
+    ).toMatchObject({
       submissionId: expect.anything(),
       rubricRevisionNumber: 2,
     });
     expect(
       (
-        await student.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`)
+        await student.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`,
+        )
       ).status,
     ).toBe(200);
     expect(
       (
-        await teacher.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/teacher-review`)
+        await teacher.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/teacher-review`,
+        )
       ).status,
     ).toBe(200);
     const otherStudent = request.agent(app);
     await session(otherStudent, "STUDENT");
     expect(
       (
-        await otherStudent.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`)
+        await otherStudent.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`,
+        )
       ).status,
     ).toBe(404);
+    setOcrProviderForTests({
+      extract: vi.fn().mockResolvedValue({
+        text: "Readable OCR text.",
+        provider: "google-vision",
+        model: "document-text-detection",
+        processedFiles: 1,
+        completedAt: new Date(),
+        pages: [
+          {
+            sourceFileId: file._id.toString(),
+            pageNumber: 1,
+            width: 1000,
+            height: 1400,
+            startOffset: 0,
+            endOffset: 18,
+            text: "Readable OCR text.",
+            words: [],
+          },
+        ],
+      }),
+    });
+    setEvaluationProviderForTests({
+      evaluate: vi
+        .fn()
+        .mockRejectedValue(
+          new AIProviderError(
+            "AI provider response remained truncated after one retry",
+            "PARSE",
+            "AI_RESPONSE_TRUNCATED",
+            200,
+            undefined,
+            ["$"],
+            "discourse",
+            "length",
+          ),
+        ),
+    });
     const secondDraft = await student
-      .patch(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission/draft`)
+      .patch(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/draft`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", studentCsrf)
-      .send({ typedText: "My revised answer", fileIds: [], draftRevision: response.body.data.submission.draftRevision });
+      .send({
+        typedText: "My revised answer",
+        fileIds: [file._id.toString()],
+        draftRevision: response.body.data.submission.draftRevision,
+      });
     expect(secondDraft.status).toBe(200);
     const secondSubmit = await student
-      .post(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission/submit`)
+      .post(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/submit`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", studentCsrf);
     expect(secondSubmit.body.data.attempt.attemptNumber).toBe(2);
+    const secondAttemptId = secondSubmit.body.data.attempt.id as string;
+    let aiFailedEvaluation;
+    for (let index = 0; index < 50; index++) {
+      aiFailedEvaluation = await SubmissionEvaluationModel.findOne({
+        attemptId: secondAttemptId,
+      }).lean();
+      if (aiFailedEvaluation?.status === "FAILED") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(aiFailedEvaluation).toMatchObject({
+      status: "FAILED",
+      failureStage: "AI_EVALUATION",
+      failureCode: "AI_RESPONSE_TRUNCATED",
+      transcribedText: "Readable OCR text.",
+    });
+    const failedAfterOcr = await student.get(
+      `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${secondAttemptId}/review`,
+    );
+    expect(failedAfterOcr.status).toBe(200);
+    expect(failedAfterOcr.body.data).toMatchObject({
+      status: "FAILED",
+      transcribedText: "Readable OCR text.",
+    });
+    expect(failedAfterOcr.body.data.files).toHaveLength(1);
+    expect(failedAfterOcr.body.data.ocrPages).toHaveLength(1);
+    expect((await student.get("/health/live")).status).toBe(200);
+    expect(
+      await SubmissionEvaluationModel.countDocuments({
+        attemptId: secondAttemptId,
+      }),
+    ).toBe(1);
+    const retryOcr = vi.fn().mockRejectedValue(new Error("OCR must not rerun"));
+    setOcrProviderForTests({ extract: retryOcr });
+    const retryEvaluation = vi.fn().mockImplementation(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      return { result: {
+        overallScore: 80,
+        maxScore: 100,
+        issues: [],
+        correctionStats: {
+          content: 0,
+          organization: 0,
+          grammar: 0,
+          vocabulary: 0,
+          mechanics: 0,
+        },
+        legendSummary: [],
+        strengths: [{ title: "Focus", description: "The response stays focused." }],
+        feedbackSections: [],
+      },
+      provider: "test",
+      model: "test-evaluator",
+      tokensUsed: 10,
+      };
+    });
+    setEvaluationProviderForTests({ evaluate: retryEvaluation });
+    const retryPath = `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${secondAttemptId}/review/retry`;
+    const [firstRetry, duplicateRetry] = await Promise.all([
+      student.post(retryPath).set("origin", origin).set("x-csrf-token", studentCsrf),
+      student.post(retryPath).set("origin", origin).set("x-csrf-token", studentCsrf),
+    ]);
+    expect([firstRetry.status, duplicateRetry.status]).toEqual([200, 200]);
+    expect(firstRetry.body.data.status).toBe("PROCESSING");
+    expect(duplicateRetry.body.data.status).toBe("PROCESSING");
+    let retriedEvaluation;
+    for (let index = 0; index < 50; index++) {
+      retriedEvaluation = await SubmissionEvaluationModel.findOne({
+        attemptId: secondAttemptId,
+      }).lean();
+      if (retriedEvaluation?.status === "COMPLETED") break;
+      await new Promise((resolve) => setTimeout(resolve, 20));
+    }
+    expect(retriedEvaluation).toMatchObject({
+      status: "COMPLETED",
+      overallScore: 80,
+      aiRetryCount: 1,
+      transcribedText: "Readable OCR text.",
+    });
+    expect(retryOcr).not.toHaveBeenCalled();
+    expect(retryEvaluation).toHaveBeenCalledOnce();
+    expect(
+      await SubmissionEvaluationModel.countDocuments({ attemptId: secondAttemptId }),
+    ).toBe(1);
     expect(
       (
-        await student.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`)
+        await student.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`,
+        )
       ).body.data.attemptNumber,
     ).toBe(1);
-    const teacherReview = await teacher.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/review`);
+    const teacherReview = await teacher.get(
+      `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/review`,
+    );
     expect(teacherReview.status).toBe(200);
-    expect(teacherReview.body.data).toMatchObject({ submissionId, rubricRevisionNumber: 2, typedText: "My revised answer" });
+    expect(teacherReview.body.data).toMatchObject({
+      submissionId,
+      rubricRevisionNumber: 2,
+      typedText: "My revised answer",
+    });
     const commented = await teacher
-      .post(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/comments`)
+      .post(
+        `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/comments`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf)
       .send({ comment: "Strong opening; support the conclusion." });
     expect(commented.status).toBe(200);
-    expect((await student.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submission/review`)).body.data.teacherComment).toBe("Strong opening; support the conclusion.");
-    expect((await unrelatedTeacher.get(`/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/review`)).status).toBe(404);
+    expect(
+      (
+        await student.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submission/review`,
+        )
+      ).body.data.teacherComment,
+    ).toBe("Strong opening; support the conclusion.");
+    expect(
+      (
+        await unrelatedTeacher.get(
+          `/api/v1/classes/${classId}/assignments/${assignmentId}/submissions/${submissionId}/review`,
+        )
+      ).status,
+    ).toBe(404);
 
     response = await teacher
       .put(`/api/v1/classes/${classId}/assignments/${assignmentId}/rubric`)
@@ -696,21 +1026,35 @@ describe("rubric revision and assignment safety", () => {
     expect(response.status).toBe(409);
     expect(response.body.error.code).toBe("RUBRIC_LOCKED");
 
-    const teacherList = await teacher.get(`/api/v1/classes/${classId}/assignments`);
+    const teacherList = await teacher.get(
+      `/api/v1/classes/${classId}/assignments`,
+    );
     expect(teacherList.body.data.assignments[0].rubric).toBeUndefined();
     expect(teacherList.body.data.assignments[0]).toMatchObject({
       rubricLocked: true,
-      submissionStats: { eligibleStudentCount: 1, submittedCount: 1, lateCount: 1 },
+      submissionStats: {
+        eligibleStudentCount: 1,
+        submittedCount: 1,
+        lateCount: 1,
+      },
     });
 
     const otherAssignment = await teacher
       .post(`/api/v1/classes/${classId}/assignments`)
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf)
-      .send({ title: "Other assignment", allowLateSubmission: false, allowResubmission: false, showMarks: true, resourceLinks: [] });
+      .send({
+        title: "Other assignment",
+        allowLateSubmission: false,
+        allowResubmission: false,
+        showMarks: true,
+        resourceLinks: [],
+      });
     expect(
       (
-        await student.get(`/api/v1/classes/${classId}/assignments/${otherAssignment.body.data.id}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`)
+        await student.get(
+          `/api/v1/classes/${classId}/assignments/${otherAssignment.body.data.id}/submissions/${submissionId}/attempts/${submittedAttemptId}/review`,
+        )
       ).status,
     ).toBe(404);
     expect(
@@ -737,7 +1081,9 @@ describe("rubric revision and assignment safety", () => {
     expect(
       (
         await teacher
-          .post(`/api/v1/classes/${classId}/assignments/${assignmentId}/archive`)
+          .post(
+            `/api/v1/classes/${classId}/assignments/${assignmentId}/archive`,
+          )
           .set("origin", origin)
           .set("x-csrf-token", teacherCsrf)
       ).body.data.status,
@@ -745,13 +1091,17 @@ describe("rubric revision and assignment safety", () => {
     expect(
       (
         await teacher
-          .post(`/api/v1/classes/${classId}/assignments/${assignmentId}/archive`)
+          .post(
+            `/api/v1/classes/${classId}/assignments/${assignmentId}/archive`,
+          )
           .set("origin", origin)
           .set("x-csrf-token", teacherCsrf)
       ).body.data.status,
     ).toBe("ARCHIVED");
 
-    const studentUser = await UserModel.findOne({ primaryPersona: "STUDENT" }).lean();
+    const studentUser = await UserModel.findOne({
+      primaryPersona: "STUDENT",
+    }).lean();
     await SubmissionModel.create({
       assignmentId: otherAssignment.body.data.id,
       classId,
@@ -763,7 +1113,9 @@ describe("rubric revision and assignment safety", () => {
       latestAttemptNumber: 0,
     });
     response = await teacher
-      .delete(`/api/v1/classes/${classId}/assignments/${otherAssignment.body.data.id}`)
+      .delete(
+        `/api/v1/classes/${classId}/assignments/${otherAssignment.body.data.id}`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf);
     expect(response.status).toBe(409);
@@ -773,9 +1125,17 @@ describe("rubric revision and assignment safety", () => {
       .post(`/api/v1/classes/${classId}/assignments`)
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf)
-      .send({ title: "Empty assignment", allowLateSubmission: false, allowResubmission: false, showMarks: true, resourceLinks: [] });
+      .send({
+        title: "Empty assignment",
+        allowLateSubmission: false,
+        allowResubmission: false,
+        showMarks: true,
+        resourceLinks: [],
+      });
     response = await teacher
-      .delete(`/api/v1/classes/${classId}/assignments/${emptyAssignment.body.data.id}`)
+      .delete(
+        `/api/v1/classes/${classId}/assignments/${emptyAssignment.body.data.id}`,
+      )
       .set("origin", origin)
       .set("x-csrf-token", teacherCsrf);
     expect(response.status).toBe(200);

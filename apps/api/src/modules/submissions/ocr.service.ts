@@ -7,12 +7,12 @@ import type { SubmissionFileRecord } from "./submission-file.model.js";
 
 export interface OcrBox { x: number; y: number; width: number; height: number; raw: { x1: number; y1: number; x2: number; y2: number } }
 export interface OcrWord { id: string; text: string; startOffset: number; endOffset: number; confidence?: number; boundingBox: OcrBox }
-export interface OcrPage { sourceFileId: string; pageNumber: number; width: number; height: number; words: OcrWord[] }
+export interface OcrPage { sourceFileId: string; pageNumber: number; width: number; height: number; startOffset: number; endOffset: number; text: string; words: OcrWord[] }
 export interface OcrResult { text: string; provider: string; model: string; processedFiles: number; pages: OcrPage[]; completedAt: Date }
 export interface OcrProvider { extract(files: SubmissionFileRecord[]): Promise<OcrResult> }
 
 export class OcrProviderError extends Error {
-  constructor(message: string, public readonly code: "OCR_PROVIDER_AUTH_FAILED" | "OCR_PROVIDER_UNSUPPORTED" | "OCR_PROVIDER_REQUEST_FAILED" | "OCR_EMPTY_RESULT", public readonly httpStatus?: number) { super(message); this.name = "OcrProviderError"; }
+  constructor(message: string, public readonly code: "OCR_PROVIDER_CONFIG_ERROR" | "OCR_PROVIDER_AUTH_FAILED" | "OCR_PROVIDER_UNSUPPORTED" | "OCR_PROVIDER_REQUEST_FAILED" | "OCR_PROVIDER_TIMEOUT" | "OCR_PROCESSING_FAILED" | "OCR_EMPTY_RESULT", public readonly httpStatus?: number) { super(message); this.name = "OcrProviderError"; }
 }
 
 let override: OcrProvider | undefined;
@@ -25,6 +25,7 @@ export function canonicalizeVisionPages(input: Array<{ sourceFileId: string; pag
   const pages: OcrPage[] = [];
   input.forEach(({ sourceFileId, pageNumber, page }, pageIndex) => {
     if (pageIndex > 0 && text && !text.endsWith("\n")) text += "\n";
+    const startOffset = text.length;
     const width = page.width ?? 1, height = page.height ?? 1;
     const words: OcrWord[] = [];
     for (const block of page.blocks ?? []) for (const paragraph of block.paragraphs ?? []) for (const providerWord of paragraph.words ?? []) {
@@ -39,7 +40,8 @@ export function canonicalizeVisionPages(input: Array<{ sourceFileId: string; pag
       const last = providerWord.symbols?.at(-1)?.property?.detectedBreak?.type;
       text += last === "LINE_BREAK" || last === "EOL_SURE_SPACE" ? "\n" : last === "HYPHEN" ? "-" : " ";
     }
-    pages.push({ sourceFileId, pageNumber, width, height, words });
+    const endOffset = text.trimEnd().length;
+    pages.push({ sourceFileId, pageNumber, width, height, startOffset, endOffset, text: text.slice(startOffset, endOffset), words });
   });
   return { text: text.trimEnd(), pages };
 }
@@ -47,23 +49,27 @@ export function canonicalizeVisionPages(input: Array<{ sourceFileId: string; pag
 function clamp(value: number) { return Math.min(1, Math.max(0, Number.isFinite(value) ? value : 0)); }
 
 export class GoogleVisionOcrProvider implements OcrProvider {
-  private readonly client: InstanceType<typeof vision.ImageAnnotatorClient>;
-  constructor(client = new vision.ImageAnnotatorClient()) { this.client = client; }
+  private client: InstanceType<typeof vision.ImageAnnotatorClient> | undefined;
+  constructor(client?: InstanceType<typeof vision.ImageAnnotatorClient>) { this.client = client; }
   async extract(files: SubmissionFileRecord[]): Promise<OcrResult> {
     const storage = await getObjectStorage();
     const detected: Array<{ sourceFileId: string; pageNumber: number; page: VisionPage }> = [];
     try {
+      const client = this.client ??= new vision.ImageAnnotatorClient({ keyFilename: env.GOOGLE_APPLICATION_CREDENTIALS! });
       for (const file of files) {
         const bytes = Buffer.from(await storage.getObject(file.objectKey));
         const images = file.mimeType === "application/pdf" ? await renderPdf(bytes) : [bytes];
         for (let pageIndex = 0; pageIndex < images.length; pageIndex++) {
-          const [response] = await this.client.documentTextDetection({ image: { content: images[pageIndex]! }, imageContext: { languageHints: env.OCR_LANGUAGE_HINTS } });
+          const [response] = await client.documentTextDetection({ image: { content: images[pageIndex]! }, imageContext: { languageHints: env.OCR_LANGUAGE_HINTS } });
           for (const page of response.fullTextAnnotation?.pages ?? []) detected.push({ sourceFileId: file._id.toString(), pageNumber: pageIndex + 1, page });
         }
       }
     } catch (error) {
       const code = typeof error === "object" && error && "code" in error ? Number(error.code) : undefined;
-      throw new OcrProviderError("Google Vision OCR request failed", code === 7 || code === 16 ? "OCR_PROVIDER_AUTH_FAILED" : "OCR_PROVIDER_REQUEST_FAILED");
+      const errorCode = typeof error === "object" && error && "code" in error ? String(error.code) : "";
+      const message = error instanceof Error ? error.message : "";
+      const classified = errorCode === "ENOENT" || /credential file|keyfilename|not found/i.test(message) ? "OCR_PROVIDER_CONFIG_ERROR" : code === 7 || code === 16 || /unauthenticated|invalid_grant|credential/i.test(message) ? "OCR_PROVIDER_AUTH_FAILED" : code === 4 || /deadline|timeout/i.test(message) ? "OCR_PROVIDER_TIMEOUT" : "OCR_PROVIDER_REQUEST_FAILED";
+      throw new OcrProviderError("Google Vision OCR request failed", classified);
     }
     const canonical = canonicalizeVisionPages(detected);
     if (!canonical.text.trim()) throw new OcrProviderError("OCR returned no meaningful text", "OCR_EMPTY_RESULT");

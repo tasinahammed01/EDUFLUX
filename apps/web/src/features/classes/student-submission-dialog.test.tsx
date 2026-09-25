@@ -35,6 +35,21 @@ describe("StudentSubmissionDialog", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent(/Choose PDF files in PDF mode/);
   });
 
+  it("persists accessible multi-image page ordering with the draft revision", async () => {
+    const first = { id: "507f1f77bcf86cd799439011", originalName: "page-1.png", mimeType: "image/png" as const, sizeBytes: 3, status: "READY" as const, createdAt: "2026-09-24T00:00:00.000Z" };
+    const second = { ...first, id: "507f1f77bcf86cd799439012", originalName: "page-2.png" };
+    const orderedDraft = { ...draft, draftFiles: [first, second], draftRevision: 4 };
+    vi.spyOn(classesApi, "submission").mockResolvedValue(orderedDraft);
+    const reorder = vi.spyOn(classesApi, "reorderSubmissionFiles").mockResolvedValue({ ...orderedDraft, draftFiles: [second, first], draftRevision: 5 });
+    render(<StudentSubmissionDialog assignment={assignment} classId="class" onClose={vi.fn()} />);
+    expect(await screen.findByText("Page 1")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Move page-1.png up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move page-2.png down" })).toBeDisabled();
+    await userEvent.click(screen.getByRole("button", { name: "Move page-2.png up" }));
+    await waitFor(() => expect(reorder).toHaveBeenCalledWith("class", "assignment", [second.id, first.id], 4));
+    expect(screen.getAllByText(/Page [12]/)).toHaveLength(2);
+  });
+
   it("submits once and redirects to the exact immutable attempt", async () => {
     const ready = { id: "file", originalName: "essay.png", mimeType: "image/png" as const, sizeBytes: 3, status: "READY" as const, createdAt: "2026-09-24T00:00:00.000Z" };
     vi.spyOn(classesApi, "uploadIntent").mockResolvedValue({ file: { ...ready, status: "PENDING" }, uploadUrl: "https://upload.test", expiresAt: "2026-09-24T01:00:00.000Z", requiredHeaders: { "content-type": "image/png" } });

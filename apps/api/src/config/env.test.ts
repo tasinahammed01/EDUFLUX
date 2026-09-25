@@ -7,6 +7,7 @@ function setEnvironment(overrides: Record<string, string | undefined>) {
   process.env = {
     ...originalEnv,
     NODE_ENV: "development",
+    OCR_PROVIDER: "openai",
     MONGODB_URI: "mongodb://127.0.0.1:27017/eduflux-test",
     CSRF_SECRET: "test-csrf-secret-at-least-32-characters"
   };

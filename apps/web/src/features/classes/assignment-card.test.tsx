@@ -77,6 +77,6 @@ describe("AssignmentCard", () => {
     );
     expect(screen.getByText(/Submitted .* Attempt 2/)).toBeVisible();
     expect(screen.getByRole("link", { name: "View Review" })).toHaveAttribute("href", "/student/classes/class-1/assignments/assignment-1/submissions/submission-1/attempts/attempt-2");
-    expect(screen.getByRole("button", { name: "Submit Another Attempt" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Submit New Attempt" })).toBeVisible();
   });
 });

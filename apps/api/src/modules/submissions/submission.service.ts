@@ -8,6 +8,7 @@ import type {
 } from "@eduflux/shared-types";
 import type {
   SubmissionDraftInput,
+  SubmissionFileOrderInput,
   UploadIntentInput,
 } from "@eduflux/validation";
 import { env } from "../../config/env.js";
@@ -238,6 +239,51 @@ export async function saveDraft(
       409,
       "DRAFT_CONFLICT",
       "Your draft changed elsewhere. Refresh before saving again.",
+    );
+  return details(updated, assignment);
+}
+export async function reorderDraftFiles(
+  assignmentId: string,
+  classId: string,
+  userId: string,
+  input: SubmissionFileOrderInput,
+) {
+  const assignment = await policy(assignmentId, classId);
+  const submission = await SubmissionModel.findOne({
+    assignmentId,
+    classId,
+    studentUserId: userId,
+  }).exec();
+  if (!submission)
+    throw new ApiError(404, "SUBMISSION_NOT_FOUND", "Submission not found.");
+  const currentIds = submission.draftFileIds.map(String);
+  if (
+    input.fileIds.length !== currentIds.length ||
+    new Set(input.fileIds).size !== input.fileIds.length ||
+    input.fileIds.some((id) => !currentIds.includes(id))
+  )
+    throw new ApiError(
+      400,
+      "INVALID_FILE_ORDER",
+      "File order must contain every current draft file exactly once.",
+    );
+  const updated = await SubmissionModel.findOneAndUpdate(
+    {
+      _id: submission._id,
+      draftRevision: input.draftRevision,
+      draftFileIds: { $all: input.fileIds, $size: input.fileIds.length },
+    },
+    {
+      $set: { draftFileIds: input.fileIds },
+      $inc: { draftRevision: 1 },
+    },
+    { returnDocument: "after", runValidators: true },
+  ).exec();
+  if (!updated)
+    throw new ApiError(
+      409,
+      "DRAFT_CONFLICT",
+      "Your draft changed elsewhere. Refresh before reordering again.",
     );
   return details(updated, assignment);
 }
