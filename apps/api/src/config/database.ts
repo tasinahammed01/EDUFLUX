@@ -1,5 +1,8 @@
 import mongoose from "mongoose";
 import { env } from "./env.js";
+import pino from "pino";
+
+const logger = pino({ level: env.LOG_LEVEL });
 
 mongoose.set("bufferCommands", false);
 
@@ -23,9 +26,19 @@ export async function ensureDatabaseConnection(): Promise<void> {
   }
   connectionPromise = connectDatabase().catch((error) => {
     connectionPromise = null;
+    logger.warn({
+      event: "database_connection_failed",
+      errorName: error instanceof Error ? error.name : "Unknown",
+      errorCode: (error as any)?.code,
+      databaseReady: false,
+    }, "Database connection failed");
     throw error;
   });
   await connectionPromise;
+  logger.info({
+    event: "database_connected",
+    databaseReady: true,
+  }, "Database connection established");
 }
 
 export async function disconnectDatabase(): Promise<void> {

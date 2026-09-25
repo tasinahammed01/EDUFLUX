@@ -44,12 +44,9 @@ import { classRouter } from "./modules/classes/class.routes.js";
 import { isDatabaseReady, ensureDatabaseConnection } from "./config/database.js";
 import { isFirebaseAdminReady } from "./config/firebase-admin.js";
 import { submissionFileRouter } from "./modules/submissions/submission-file.routes.js";
+import { requireDatabase } from "./middleware/database.middleware.js";
 
-if (env.NODE_ENV !== "test") {
-  ensureDatabaseConnection().catch((error) => {
-    console.error("Failed to initialize database connection:", error.message);
-  });
-}
+
 
 export const app = express();
 
@@ -102,7 +99,23 @@ app.get("/health", (_request, response) => {
 app.get("/health/live", (_request, response) =>
   response.json({ status: "ok" }),
 );
-app.get("/health/ready", (request, response) => {
+app.get("/health/ready", async (request, response) => {
+  try {
+    await ensureDatabaseConnection();
+  } catch (error) {
+    const logger = (request as any).log;
+    if (logger) {
+      logger.warn({
+        event: "database_connection_failed",
+        errorName: error instanceof Error ? error.name : "Unknown",
+        errorCode: (error as any)?.code,
+        databaseReady: false,
+      }, "Health check failed - database connection error");
+    }
+    response.status(503).json({ status: "unavailable" });
+    return;
+  }
+
   const dbReady = isDatabaseReady();
   const firebaseReady = isFirebaseAdminReady();
 
@@ -124,11 +137,19 @@ app.get("/health/ready", (request, response) => {
     return;
   }
 
+  const logger = (request as any).log;
+  if (logger) {
+    logger.info({
+      databaseReady: true,
+      firebaseReady: true,
+    }, "Health check passed - all dependencies ready");
+  }
+
   response.json({ status: "ok" });
 });
 app.use("/api/v1/auth", authRouter);
-app.use("/api/v1/classes", classRouter);
-app.use("/api/v1/submission-files", submissionFileRouter);
+app.use("/api/v1/classes", requireDatabase, classRouter);
+app.use("/api/v1/submission-files", requireDatabase, submissionFileRouter);
 
 app.use((_request, response) =>
   response.status(404).json({

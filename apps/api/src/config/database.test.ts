@@ -18,9 +18,18 @@ const env = vi.hoisted(() => ({
   MONGODB_URI: "mongodb://test:27017/test",
   MONGODB_MAX_POOL_SIZE: 10,
   NODE_ENV: "test",
+  LOG_LEVEL: "error",
 }));
 
 vi.mock("./env.js", () => ({ env }));
+
+const pino = vi.hoisted(() => vi.fn(() => ({
+  info: vi.fn(),
+  warn: vi.fn(),
+  error: vi.fn(),
+})));
+
+vi.mock("pino", () => ({ default: pino }));
 
 describe("database connection", () => {
   beforeEach(() => {
