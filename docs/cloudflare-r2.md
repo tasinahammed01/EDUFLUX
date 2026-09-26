@@ -1,6 +1,6 @@
 # Cloudflare R2 for submission attachments
 
-EduFlux keeps submission objects private. Browser uploads use short-lived presigned `PUT` URLs; reads use short-lived URLs issued only after the API authorizes the student owner or a teacher in the class. Credentials and object keys remain server-side.
+MENTRA keeps submission objects private. Browser uploads use short-lived presigned `PUT` URLs; reads use short-lived URLs issued only after the API authorizes the student owner or a teacher in the class. Credentials and object keys remain server-side.
 
 ## Configuration
 

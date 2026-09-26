@@ -8,7 +8,7 @@ export async function upsertFirebaseUser(identity:VerifiedFirebaseIdentity,perso
  if(!identity.email)throw new Error("Verified Firebase account has no email");
  const provider=identity.firebase?.sign_in_provider;
  const update={
-  $set:{email:identity.email,emailCanonical:canonicalizeEmail(identity.email),displayName:(identity.name||identity.email.split("@")[0]||"EduFlux user").slice(0,80),emailVerified:Boolean(identity.email_verified),lastLoginAt:new Date(),...(identity.picture?{photoURL:identity.picture}:{})},
+  $set:{email:identity.email,emailCanonical:canonicalizeEmail(identity.email),displayName:(identity.name||identity.email.split("@")[0]||"MENTRA user").slice(0,80),emailVerified:Boolean(identity.email_verified),lastLoginAt:new Date(),...(identity.picture?{photoURL:identity.picture}:{})},
   $setOnInsert:{firebaseUid:identity.uid,platformRole:"USER",status:"ACTIVE",authProviders:provider?[provider]:[],...(persona?{primaryPersona:persona}:{})}
  };
  return UserModel.findOneAndUpdate({firebaseUid:identity.uid},update,{upsert:true,returnDocument:"after",runValidators:true,setDefaultsOnInsert:true}).exec();

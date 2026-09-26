@@ -65,7 +65,7 @@ export function JoinClassPage({ token }: { token: string }) {
   return (
     <main className="join-page">
       <div className="join-card">
-        <p className="eyebrow">Join EduFlux Class</p>
+        <p className="eyebrow">Join MENTRA Class</p>
         <h1>{preview.name}</h1>
         {preview.subjectLevel && <strong>{preview.subjectLevel}</strong>}
         <dl>

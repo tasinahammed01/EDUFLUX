@@ -27,7 +27,7 @@ try {
     SubmissionEvaluationModel,
   ])
     await model.createIndexes();
-  logger.info("EduFlux indexes created without dropping existing indexes");
+  logger.info("MENTRA indexes created without dropping existing indexes");
 } finally {
   await disconnectDatabase();
 }

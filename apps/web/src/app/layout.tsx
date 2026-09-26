@@ -16,10 +16,10 @@ const instrumentSerif = Instrument_Serif({ subsets: ["latin"], variable: "--font
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "http://localhost:3000"),
-  title: { default: "EduFlux — Teaching intelligence, beautifully connected", template: "%s | EduFlux" },
-  description: "One focused workspace for assignments, thoughtful AI feedback, and visible student progress.",
-  openGraph: { title: "EduFlux", description: "Teaching intelligence, beautifully connected.", type: "website" },
-  twitter: { card: "summary_large_image", title: "EduFlux", description: "Teaching intelligence, beautifully connected." }
+  title: { default: "MENTRA – AI Writing Feedback & Adaptive Practice", template: "%s | MENTRA" },
+  description: "AI-powered writing feedback, assessment and adaptive practice for students and teachers.",
+  openGraph: { title: "MENTRA", description: "AI-powered writing feedback, assessment and adaptive practice for students and teachers.", type: "website" },
+  twitter: { card: "summary_large_image", title: "MENTRA", description: "AI-powered writing feedback, assessment and adaptive practice for students and teachers." }
 };
 
 export const viewport: Viewport = {

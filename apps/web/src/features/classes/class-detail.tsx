@@ -187,7 +187,7 @@ export function ClassDetail({
             <dl>
               <div>
                 <dt>Teacher</dt>
-                <dd>{item.owner?.displayName || "EduFlux teacher"}</dd>
+                <dd>{item.owner?.displayName || "MENTRA teacher"}</dd>
               </div>
               <div>
                 <dt>Assignments</dt>

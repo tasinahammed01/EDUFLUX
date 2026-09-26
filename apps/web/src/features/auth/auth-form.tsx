@@ -218,7 +218,7 @@ export function AuthForm({ mode }: { mode: "login" | "register" }) {
         </button>
       </form>
       <p className="auth-switch">
-        {mode === "register" ? "Already have an account?" : "New to EduFlux?"}{" "}
+        {mode === "register" ? "Already have an account?" : "New to MENTRA?"}{" "}
         <Link href={mode === "register" ? "/login" : "/register"}>
           {mode === "register" ? "Sign in" : "Create account"}
         </Link>

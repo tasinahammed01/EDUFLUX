@@ -623,7 +623,7 @@ class OpenRouterProvider extends ChatCompletionsProvider {
   readonly endpoint: string;
   readonly extraHeaders = {
     "HTTP-Referer": env.WEB_ORIGIN,
-    "X-Title": "EduFlux",
+    "X-Title": "MENTRA",
   };
   constructor(config: AIProviderConfig) {
     super(config);

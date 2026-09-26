@@ -1,4 +1,4 @@
-# EduFlux
+# MENTRA
 
 A modern education platform for clearer teaching, simpler class management, and better student support.
 
@@ -10,13 +10,13 @@ A modern education platform for clearer teaching, simpler class management, and 
 ![MongoDB](https://img.shields.io/badge/Database-MongoDB-47A248?logo=mongodb&logoColor=white)
 ![Turborepo](https://img.shields.io/badge/Monorepo-Turborepo-EF4444?logo=turborepo&logoColor=white)
 
-EduFlux brings identity, class spaces, and role-based access into one focused experience. Teachers can create classes and share join codes. Students can join those classes and see them from their own dashboard.
+MENTRA brings identity, class spaces, and role-based access into one focused experience. Teachers can create classes and share join codes. Students can join those classes and see them from their own dashboard.
 
 The repository currently provides the platform foundation. Learning workflows such as assignments, submissions, assessment, and analytics are planned and are not presented as finished features.
 
 ## Table of contents
 
-- [About EduFlux](#about-eduflux)
+- [About MENTRA](#about-mentra)
 - [Project status](#project-status)
 - [Features](#features)
 - [Teacher features](#teacher-features)
@@ -26,7 +26,7 @@ The repository currently provides the platform foundation. Learning workflows su
 - [Technology stack](#technology-stack)
 - [Architecture](#architecture)
 - [Project structure](#project-structure)
-- [How EduFlux works](#how-eduflux-works)
+- [How MENTRA works](#how-mentra-works)
 - [UI, motion, and accessibility](#ui-motion-and-accessibility)
 - [Getting started](#getting-started)
 - [Environment variables](#environment-variables)
@@ -36,9 +36,9 @@ The repository currently provides the platform foundation. Learning workflows su
 - [Deployment](#deployment)
 - [Roadmap](#roadmap)
 
-## About EduFlux
+## About MENTRA
 
-EduFlux is an education SaaS project for teachers, students, classes, and schools. Its goal is to make everyday learning work easier to manage without taking control away from teachers.
+MENTRA is an education SaaS project for teachers, students, classes, and schools. Its goal is to make everyday learning work easier to manage without taking control away from teachers.
 
 The current application focuses on a secure starting point: a responsive public website, Firebase sign-in, persona onboarding, protected dashboards, and server-controlled class access.
 
@@ -146,7 +146,7 @@ Possible future Admin work includes user and class management, platform activity
 
 ## Authentication and security
 
-EduFlux uses Firebase Authentication for identity and MongoDB for application profiles and permissions.
+MENTRA uses Firebase Authentication for identity and MongoDB for application profiles and permissions.
 
 - Firebase handles email/password and Google identity.
 - The browser exchanges a fresh Firebase ID token with the Express API.
@@ -238,7 +238,7 @@ EDUFLUX/
 └── turbo.json
 ```
 
-## How EduFlux works
+## How MENTRA works
 
 ### Authentication flow
 
@@ -261,7 +261,7 @@ New Google users choose a Teacher or Student persona on the onboarding screen. T
 ### Class flow
 
 ```text
-Teacher creates class → EduFlux generates join code → Teacher shares code
+Teacher creates class → MENTRA generates join code → Teacher shares code
 
 Student enters code → Membership is created → Class appears on dashboard
 ```
@@ -270,7 +270,7 @@ Every class action uses the MongoDB user ID. The `ClassMembership` record connec
 
 ## UI, motion, and accessibility
 
-EduFlux is designed for desktop, tablet, and mobile screens.
+MENTRA is designed for desktop, tablet, and mobile screens.
 
 - Desktop uses the full editorial motion and 3D experience.
 - Tablet keeps the Hero experience while reducing page-wide motion complexity.
@@ -447,4 +447,4 @@ This README does not claim that the API or worker has a public deployment.
 - [ ] Student analytics and Admin dashboard
 - [ ] Notifications, billing, and background job queues
 
-EduFlux is under active development. Implemented and planned features are kept separate so the current product scope stays clear. The source is available at [github.com/tasinahammed01/EDUFLUX](https://github.com/tasinahammed01/EDUFLUX).
+MENTRA is under active development. Implemented and planned features are kept separate so the current product scope stays clear. The source is available at [github.com/tasinahammed01/EDUFLUX](https://github.com/tasinahammed01/EDUFLUX).

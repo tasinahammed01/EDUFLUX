@@ -60,7 +60,7 @@ async function request<T>(
       );
     throw new ApiClientError(
       "NETWORK_ERROR",
-      "We could not reach EduFlux. Check your connection and try again.",
+      "We could not reach MENTRA. Check your connection and try again.",
       0,
     );
   } finally {

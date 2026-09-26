@@ -173,7 +173,7 @@ export async function previewInvite(token: string) {
     ...(record.endDate ? { endDate: record.endDate } : {}),
     status: record.status,
     teacher: {
-      displayName: owner?.displayName ?? "EduFlux teacher",
+      displayName: owner?.displayName ?? "MENTRA teacher",
       ...(owner?.photoURL ? { photoURL: owner.photoURL } : {}),
       role: "OWNER" as const,
     },
@@ -336,7 +336,7 @@ export async function getClassForMember(
   return {
     ...summary,
     owner: {
-      displayName: owner?.displayName ?? "EduFlux teacher",
+      displayName: owner?.displayName ?? "MENTRA teacher",
       ...(owner?.photoURL ? { photoURL: owner.photoURL } : {}),
       ...(owner?.email ? { email: owner.email } : {}),
       role: "OWNER",

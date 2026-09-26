@@ -53,7 +53,7 @@ describe("AI provider gateway", () => {
     expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({
       headers: expect.objectContaining({
         Authorization: `Bearer ${config.apiKey}`,
-        "X-Title": "EduFlux",
+        "X-Title": "MENTRA",
       }),
     });
     expect(
